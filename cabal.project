@@ -1,0 +1,24 @@
+packages: .
+
+-- cabal-doctest from hackage requires a too old version of Cabal. Thus we pull from GitHub.
+source-repository-package
+    type: git
+    location: https://github.com/haskellari/cabal-doctest
+    tag: 44f04e6
+
+-- These three packages are patched to work with the unix package versions
+-- greater than 2.8. The following links are to temporary forks. These will
+-- hopefully not be needed too long.
+source-repository-package
+    type: git
+    location: https://github.com/Merivuokko/logger
+    subdir: fast-logger
+
+source-repository-package
+    type: git
+    location: https://github.com/Merivuokko/unix-compat
+
+source-repository-package
+    type: git
+    location: https://github.com/Merivuokko/wai
+    subdir: warp
