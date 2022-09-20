@@ -5,7 +5,7 @@
 module Main (main) where
 
 import Control.Applicative ((<|>))
-import Control.Monad (unless)
+import Control.Monad (ap, unless)
 import Data.Binary
 import Data.Bool (bool)
 import Data.HashSet qualified as HS
@@ -63,7 +63,13 @@ data SiteConfig = SiteConfig {
     markdownReaderOptions :: ReaderOptions,
 
     -- | HTML writer options
-    htmlWriterOptions :: WriterOptions
+    htmlWriterOptions :: WriterOptions,
+
+    -- | Time locale settings
+    timeLocale :: TimeLocale,
+
+    -- | Default time format string
+    dateFormat :: T.Text
     }
     deriving stock (Show)
 
@@ -93,7 +99,8 @@ defaultSiteConfig = SiteConfig {
         "strings",
         "subtitle",
         "title-prefix",
-        "title-suffix"
+        "title-suffix",
+        "toc"
     ],
     shiftHeaders = 1,
     markdownReaderOptions = def { readerExtensions = pandocExtensions },
@@ -104,20 +111,42 @@ defaultSiteConfig = SiteConfig {
         writerTableOfContents = True,
         writerTemplate = Nothing,
         writerTOCDepth = 2
-    }
+    },
+    timeLocale = defaultTimeLocale,
+    dateFormat = "%Y-%m-%d"
 }
 
 finnishSite :: SiteConfig
 finnishSite = defaultSiteConfig {
     pagesDir = [osp|pages/fi|],
-    outputDir = [osp|output/fi|]
-    }
+    outputDir = [osp|output/fi|],
+    timeLocale = finnishTimeLocale,
+    dateFormat = "%Ana %d. %Bta %Y"
+}
+
+-- | Finnish time locale
+finnishTimeLocale :: TimeLocale
+finnishTimeLocale = TimeLocale {
+    wDays = fmap (ap (,) (take 2))
+            $ [ "sunnuntai", "maanantai", "tiistai", "keskiviikko",
+                "torstai", "perjantai", "lauantai" ],
+    months = fmap ((,) =<< (<> "kuu"))
+             $ [ "tammi", "helmi", "maalis", "huhti", "touko", "kesä",
+                 "heinä", "elo", "syys", "loka", "marras", "joulu" ],
+    amPm = ("ennen puoltapäivää", "puolen päivän jälkeen"),
+    dateTimeFmt = "%d.%m.%Y %H:%M:%S",
+    dateFmt = "%d.%m.%Y",
+    timeFmt = "%H:%M:%S",
+    time12Fmt = "%H:%M:%S",
+    knownTimeZones = []
+}
 
 englishSite :: SiteConfig
 englishSite = defaultSiteConfig {
     pagesDir = [osp|pages/en|],
-    outputDir = [osp|output/en|]
-    }
+    outputDir = [osp|output/en|],
+    dateFormat = "on %a, %d %b %Y"
+}
 
 --------------------------
 -- End of Configuration --
@@ -283,7 +312,7 @@ loadPage config meta fp = cacheAction ("page" :: T.Text, fp) do
     let doc' = flip modifyMeta doc $
                \m -> addMeta "site-root" (MetaString rootUrlRelative)
                      . addMeta "date-meta" (MetaString . T.pack $! iso8601Show time)
-                     . addMeta "date" (MetaString . T.pack $! formatTime defaultTimeLocale "%Y-%m-%d %H:%M:%S" time)
+                     . addMeta "date" (MetaString . T.pack $! formatTime config.timeLocale (T.unpack config.dateFormat) time)
                      $! metaUnion m meta
         meta' = getDocMeta doc'
 
