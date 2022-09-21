@@ -98,6 +98,7 @@ defaultSiteConfig = SiteConfig {
     optionalMetadata = HS.fromList [
         "abstract",
         "description",
+        "hidden",
         "keywords",
         "menu-title",
         "page-title",
@@ -174,6 +175,9 @@ data Page = Page {
     -- | Sorting score for the page in a menu
     order :: Int,
 
+    -- | Is this page hidden from menus
+    hidden :: Bool,
+
     -- | Template that is to be used to render this page
     template :: Template T.Text,
 
@@ -234,11 +238,11 @@ loadPages config = do
 
 -- | Build a menu trie from all pages
 buildMenu :: [Page] -> MenuTrie
-buildMenu = roseTrieFromList . fmap toMenuItem
+buildMenu = roseTrieFromList . fmap toAssoc . filter (not . (.hidden))
   where
-    -- Turn a page into its menu item
-    toMenuItem :: Page -> ([Url], Page)
-    toMenuItem page = (page.urlSegments, page)
+    -- Associate a page with its breadcrumb
+    toAssoc :: Page -> ([Url], Page)
+    toAssoc page = (page.urlSegments, page)
 
 -- | Add menu metadata to a page
 addMenuToPage :: MenuTrie -> Page -> Page
@@ -357,6 +361,10 @@ loadPage config meta fp = cacheAction ("page" :: T.Text, fp) do
                     $ lookupMeta "menu-title" meta'
                     <|> lookupMeta "title" meta'
         order = either error fst . T.decimal . stringify . lookupMetaForce "order" $ meta'
+        hidden = case lookupMeta "hidden" meta' of
+                     Just (MetaBool val) -> val
+                     Nothing -> False
+                     val -> error $ "Invalid value for meta key 'hidden': " <> (show val)
 
     templateFile <- (liftIO . encodeFS) . T.unpack . stringify . lookupMetaForce "template" $ meta'
     template <- loadTemplate $! config.templatesDir </> templateFile
@@ -367,6 +375,7 @@ loadPage config meta fp = cacheAction ("page" :: T.Text, fp) do
         doc = doc',
         menuTitle = menuTitle,
         order = order,
+        hidden = hidden,
         template = template,
         destFile = destFile
     }
