@@ -10,6 +10,9 @@ module LoveGen.Utils
         Url,
         osPathToUrl,
 
+        -- Monadic conditional
+        ifM,
+
         -- * File management
         readTextFile,
         writeTextFile,
@@ -71,6 +74,13 @@ type Url = T.Text
 
 osPathToUrl :: OsPath -> Action Url
 osPathToUrl = liftIO . decodeFS >=> pure . T.pack
+
+-- | Like if, but condition can be monadic
+ifM :: Monad m => m Bool -- ^ Conditional
+    -> m a -- ^ Then action
+    -> m a -- ^ Else action
+    -> m a
+ifM cond true false = cond >>= bool false true
 
 -- | Read a text file (in UTF-8) within the shake Action monad.
 --
