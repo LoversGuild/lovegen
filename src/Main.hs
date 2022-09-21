@@ -4,8 +4,8 @@
 
 module Main (main) where
 
-import Control.Applicative ((<|>))
-import Control.Monad (ap, unless)
+import Control.Applicative (liftA2, (<|>))
+import Control.Monad (ap, filterM, when, unless)
 import Data.Binary
 import Data.Bool (bool)
 import Data.HashSet qualified as HS
@@ -40,6 +40,9 @@ data SiteConfig = SiteConfig {
 
     -- | Directory of template files
     templatesDir :: OsPath,
+
+    -- | Static files' directory
+    staticDir :: OsPath,
 
     -- | Name of the index file (without extension)
     indexFileName :: OsPath,
@@ -78,6 +81,7 @@ defaultSiteConfig :: SiteConfig
 defaultSiteConfig = SiteConfig {
     pagesDir = [osp|.|],
     templatesDir = [osp|templates|],
+    staticDir = [osp|static|],
     indexFileName = [osp|index|],
     metaYamlFile = [osp|meta.yaml|],
     outputDir = [osp|output|],
@@ -202,6 +206,7 @@ buildSite config = do
     pages <- loadPages config
     let menu = buildMenu pages
     mapM_ (writePage config . addMenuToPage menu) pages
+    copyStaticFiles config
 
 -- | Load all pages
 loadPages :: HasCallStack => SiteConfig -> Action [Page]
@@ -361,6 +366,36 @@ writePage config page = cacheActionWith ("writePage" :: T.Text, page.destFile) p
 readMarkdownFile :: SiteConfig -> OsPath -> Action Pandoc
 readMarkdownFile config fp
     = readTextFile fp >>= readPandoc (readMarkdown config.markdownReaderOptions) fp
+
+-- | Copy static files to their destination directories
+copyStaticFiles :: SiteConfig -> Action ()
+copyStaticFiles config = do
+    let staticSegmentsCount = length . splitDirectories $ config.staticDir
+    files <- liftIO $! listDirectoryRecursive config.staticDir
+             >>= filterM (liftIO . doesFileExist)
+    _ <- forP files \sourceFile ->
+        let pathSegments = drop staticSegmentsCount $! splitDirectories sourceFile
+            destFile = joinPath $! config.outputDir : pathSegments
+        in copyFileIfChanged sourceFile destFile
+    pure ()
+
+-- | Copy a single file creating missing directories as necessary. The copy is
+-- not performed, if destination file exists, and its size and modification
+-- time match the source file.
+copyFileIfChanged :: OsPath -- ^ Source file path
+         -> OsPath -- ^ Destination file path
+         -> Action ()
+copyFileIfChanged source dest = liftIO $ do
+    -- Check if the file needs to be copied
+    doCopy <- ifM (not <$> doesFileExist dest) (pure True)
+              $ ifM (liftA2 (/=) (getFileSize source) (getFileSize dest)) (pure True)
+              $ ifM (liftA2 (/=) (getModificationTime source) (getModificationTime dest)) (pure True)
+              $ (pure False)
+
+    when doCopy $ do
+        putStrLn $ "Copying file " <> (show source)
+        createDirectoryIfMissing True (takeDirectory dest)
+        copyFileWithMetadata source dest
 
 -- | Make a RoseTrie from a directory tree
 makeDirectoryTrie :: OsPath -> Action (RoseTrie OsPath OsPath)
