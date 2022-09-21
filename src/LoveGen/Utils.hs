@@ -39,7 +39,9 @@ module LoveGen.Utils
         RoseTrie (..),
         RoseForest,
         singletonRoseTrie,
-        rosesFromList,
+        roseTrieFromList,
+        getRoot,
+        getForest,
         insertWithPath,
 
         -- * Time information management
@@ -102,8 +104,7 @@ readBinaryFile fp = do
 writeBinaryFile :: HasCallStack => OsPath -> BS.ByteString -> Action ()
 writeBinaryFile fp bytes
     = liftIO $! do
-          let dir = takeDirectory fp
-          createDirectoryIfMissing True dir
+          createDirectoryIfMissing True $! takeDirectory fp
           doesFileExist fp >>= flip when (removeFile fp)
           OP.writeFile' fp bytes
 
@@ -234,10 +235,29 @@ singletonRoseTrie :: a -> RoseTrie k a
 singletonRoseTrie node = TrieNode node HM.empty
 
 -- | Convert a list of paths to nods into a RoseTrie
-rosesFromList
+roseTrieFromList
     :: (HasCallStack, Hashable k, Show k, Show a)
-    => [([k], a)] -> RoseForest k a
-rosesFromList = foldl' (flip $ uncurry insertWithPath) HM.empty . sortOn (length . fst)
+    => [([k], a)] -> RoseTrie k a
+roseTrieFromList = roseTrieFromSortedList . sortOn (length . fst)
+  where
+    -- Extract root element from the sorted (path, item) list, construct the
+    -- top node from it and pass the rest to the rose forest builder
+    -- roseTrieFromSortedList :: HasCallStack => [([k], a)] -> RoseTrie k a
+    roseTrieFromSortedList [] = error $ "Cannot create rose trie from empty item list."
+    roseTrieFromSortedList (([], item) : rest)
+        = TrieNode item $! rosesFromList rest
+    roseTrieFromSortedList list = error $ "No trie root element found in " <> (show list)
+
+    -- rosesFromList :: HasCallStack => [([k], a)] -> RoseForest k a
+    rosesFromList = foldl' (flip $ uncurry insertWithPath) HM.empty
+
+-- | Extract the root item from a rose trie
+getRoot :: RoseTrie k a -> a
+getRoot (TrieNode root _) = root
+
+-- | Extract the forest from a rose trie
+getForest :: RoseTrie k a -> RoseForest k a
+getForest (TrieNode _ forest) = forest
 
 -- | Insert a node to a forest with path
 insertWithPath
