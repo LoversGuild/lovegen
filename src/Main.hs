@@ -6,13 +6,14 @@ module Main (main) where
 
 import Control.Applicative (liftA2, (<|>))
 import Control.Monad (ap, filterM, when, unless)
+import Data.Bifunctor (second)
 import Data.Binary
 import Data.Bool (bool)
+import Data.HashMap.Strict qualified as HM
 import Data.HashSet qualified as HS
 import Data.List (sortOn)
 import Data.Map.Strict qualified as M
 import Data.Maybe (fromMaybe)
-import Data.HashMap.Strict qualified as HM
 import Data.Text qualified as T
 import Data.Text.Read qualified as T
 import Data.Time
@@ -183,7 +184,7 @@ data Page = Page {
     deriving anyclass (Binary)
 
 -- | A trie containing data needed for menu creation
-type MenuMap = RoseForest Url Page
+type MenuTrie = RoseTrie Url Page
 
 -- | Main function of the generator
 main :: IO ()
@@ -232,57 +233,86 @@ loadPages config = do
               forP (HM.elems subforest) (loadPagesRecursive combinedMeta) >>= pure . concat
 
 -- | Build a menu trie from all pages
-buildMenu :: [Page] -> MenuMap
-buildMenu = rosesFromList . fmap toMenuItem . filter (not . null . (.urlSegments))
+buildMenu :: [Page] -> MenuTrie
+buildMenu = roseTrieFromList . fmap toMenuItem
   where
     -- Turn a page into its menu item
     toMenuItem :: Page -> ([Url], Page)
     toMenuItem page = (page.urlSegments, page)
 
 -- | Add menu metadata to a page
-addMenuToPage :: MenuMap -> Page -> Page
+addMenuToPage :: MenuTrie -> Page -> Page
 addMenuToPage menu page
-    = let pageMenu = buildMenuForPath page.urlSegments menu (length page.urlSegments) 1
+    = let pageMenu = buildMenuForPath page.urlSegments menu
       in page {
              doc = modifyMeta (addMeta "menu" pageMenu) page.doc
          }
 
--- | Build a menu for a single page from the full menu trie
+-- | Build a menu for a single page from the full menu trie.
+--
+-- The resulting value is a MetaList of all open menu levels leading to the
+-- destination page. The destination page's children are included in the menu.
+--
+-- Each menu level in the returned list is a MetaMap which contains the
+-- following keys/values:
+--
+--     title: The menu-title of the root page of this menu branch
+--     url: URLof the root page
+--     level: The depth of the root page in menu hierarchy (starting from 0).
+--     items: MetaList of menu item definitions.
+--
+-- The menu item definitions are MetaMaps containing the following keys/values:
+--
+--     title: menu-title of the menu item
+--     url: URL of the page referred to by this item
+--
 buildMenuForPath
-    ::  [Url] -- ^ List of page's URL fragments
-    -> MenuMap -- ^ The full menu trie containing all pages
-    -> Int -- ^ Menu depth
-    -> Int -- ^ Current rendering level
-    -> MetaValue -- ^ The resulting cut down version of the menu as Pandoc metadata map
-buildMenuForPath paths menu depth level
-    = let menuItems = fmap (uncurry buildMenuItems) . sortOn (getOrder . snd) . HM.toList $ menu
-      in if null menuItems
-         then MetaString "" -- Unfortunately empty maps are considered to be True in doctemplates conditionals
-         else MetaMap . M.fromList $
-              [ ("level", MetaString . T.pack . show $! level),
-                ("items", MetaList $ menuItems)
-              ]
+    :: [Url] -- ^ List of page's URL segments
+    -> MenuTrie -- ^ The full menu trie containing all pages
+    -> MetaValue
+buildMenuForPath initialPath initialMenu
+    = MetaList $! buildMenuLevels initialPath initialMenu 0
   where
-    buildMenuItems :: Url -> RoseTrie Url Page -> MetaValue
-    buildMenuItems key (TrieNode page submenu)
-        = MetaMap . M.fromList $!
-          [ ("url", MetaString $! (T.replicate depth "../") <> page.url),
+    -- | Build menu level definitions for all open branches (following the provided path)
+    buildMenuLevels :: [Url] -> MenuTrie -> Int -> [MetaValue]
+    buildMenuLevels path (TrieNode root submenu) level
+        = menuLevel : nextMenuLevels path
+      where
+        menuItems :: [MetaValue]
+        menuItems = fmap toMenuItem . sortOn ((.order) . snd) . fmap (second getRoot) . HM.toList $ submenu
+
+        -- Converta (Url, Page) pair to a proper menu item.
+        toMenuItem :: (Url, Page) -> MetaValue
+        toMenuItem (p, page)
+            = let isCurrent = take 1 path == [p]
+              in MetaMap . M.fromList $! pageEntries isCurrent page
+
+        menuLevel :: MetaValue
+        menuLevel
+            = MetaMap . M.fromList . concat $
+              [ pageEntries True root,
+                [ ("level", MetaString . T.pack . show $! level) ],
+                [ ("items", MetaList menuItems) ]
+              ]
+
+        nextMenuLevels :: [Url] -> [MetaValue]
+        nextMenuLevels [] = []
+        nextMenuLevels (p : ps)
+            = case HM.lookup p submenu of
+                  Just subtrie -> buildMenuLevels ps subtrie (level + 1)
+                  Nothing -> error $ "Unknown menu item " <> (show p) <> " in menu path " <> (show initialPath)
+
+    -- Relative URL of the root page of the whole site
+    rootRelative :: Url
+    rootRelative = T.replicate (length initialPath) "../"
+
+    -- Construct menu item entries for a page
+    pageEntries :: Bool -> Page -> [(Url, MetaValue)]
+    pageEntries isCurrent page
+        = [ ("url", MetaString $! rootRelative <> page.url),
             ("title", page.menuTitle),
-            ("submenu", if descend key
-                        then buildMenuForPath (tail paths) submenu depth (level + 1)
-                        else MetaString ""
-            )
+            ("current", MetaBool isCurrent)
           ]
-
-    -- Get the sorting order of a Trie node
-    getOrder :: RoseTrie a Page -> Int
-    getOrder (TrieNode page _) = page.order
-
-    -- Find out whether to descend into a submenu
-    descend :: Url -> Bool
-    descend url
-        | null paths = False
-        | otherwise = head paths == url
 
 -- | Load a single page from a Markdown file
 loadPage :: HasCallStack => SiteConfig -> Meta -> OsPath -> Action Page
@@ -309,7 +339,7 @@ loadPage config meta fp = cacheAction ("page" :: T.Text, fp) do
             if null urlSegments
             then "./"
             else T.replicate (length urlSegments) "../"
-    
+
     time <- fetchLastCommitTime fp >>= \case
         Just t -> pure $! t
         Nothing -> liftIO $! getModificationTime fp
@@ -399,16 +429,7 @@ copyFileIfChanged source dest = liftIO $ do
 
 -- | Make a RoseTrie from a directory tree
 makeDirectoryTrie :: OsPath -> Action (RoseTrie OsPath OsPath)
-makeDirectoryTrie rootDir = liftIO $! listDirectoryRecursive rootDir >>= pure . buildTrie (length $! splitDirectories rootDir)
-  where
-    buildTrie :: Int -> [OsPath] -> RoseTrie OsPath OsPath
-    buildTrie _ [] = error $ "No directory entries"
-    buildTrie prefixLength (rootDir' : paths)
-        = if equalFilePath rootDir rootDir'
-          then TrieNode rootDir'
-               $! rosesFromList
-               . fmap (\p -> (drop prefixLength $! splitDirectories p, p))
-               $! paths
-          else error $ "listDirectoryRecursive did not return the root dir " <> (show rootDir)
-               <> " as the first element, but " <> (show rootDir')
-
+makeDirectoryTrie rootDir
+    = let prefixLength = length $! splitDirectories rootDir
+      in liftIO (listDirectoryRecursive rootDir)
+         >>= pure . roseTrieFromList . fmap (\p -> (drop prefixLength $! splitDirectories p, p))
