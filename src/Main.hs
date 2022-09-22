@@ -87,6 +87,7 @@ defaultSiteConfig = SiteConfig {
     metaYamlFile = [osp|meta.yaml|],
     outputDir = [osp|output|],
     requiredMetadata = HS.fromList [
+        "base-url",
         "date",
         "date-meta",
         "lang",
@@ -99,6 +100,7 @@ defaultSiteConfig = SiteConfig {
         "abstract",
         "description",
         "hidden",
+        "indexing",
         "keywords",
         "menu-title",
         "page-title",
@@ -337,8 +339,8 @@ loadPage config meta fp = cacheAction ("page" :: T.Text, fp) do
     unless (contentDirs == pagesDirSegments) $ fail $! "Page file name " <> (show fp) <> " does not start with page directory " <> (show config.pagesDir)
     urlSegments <- mapM osPathToUrl destPathSegments
     let url = if null urlSegments
-            then "."
-            else T.intercalate "/" urlSegments
+            then "./"
+            else (T.intercalate "/" urlSegments) <> "/"
         rootUrlRelative =
             if null urlSegments
             then "./"
@@ -350,6 +352,7 @@ loadPage config meta fp = cacheAction ("page" :: T.Text, fp) do
 
     let doc' = flip modifyMeta doc $
                \m -> addMeta "site-root" (MetaString rootUrlRelative)
+                     . addMeta "url" (MetaString url)
                      . addMeta "date-meta" (MetaString . T.pack $! iso8601Show time)
                      . addMeta "date" (MetaString . T.pack $! formatTime config.timeLocale (T.unpack config.dateFormat) time)
                      $! metaUnion m meta
