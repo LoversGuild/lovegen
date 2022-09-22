@@ -94,7 +94,8 @@ defaultSiteConfig = SiteConfig {
         "order",
         "site-root",
         "template",
-        "title"
+        "title",
+        "url",
     ],
     optionalMetadata = HS.fromList [
         "abstract",
