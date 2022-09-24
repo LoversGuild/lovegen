@@ -24,9 +24,12 @@ import GHC.Generics (Generic)
 import GHC.Stack (HasCallStack)
 import System.Directory.OsPath
 import System.OsPath
+import Text.DocLayout (render)
 import Text.Pandoc hiding (getModificationTime)
 import Text.Pandoc.Readers.Markdown (yamlToMeta)
 import Text.Pandoc.Shared (headerShift, stringify)
+import Text.Pandoc.Writers.Shared (lookupMetaString)
+import Text.Pandoc.XML (escapeStringForXML)
 
 import LoveGen.Orphans ()
 import LoveGen.Utils
@@ -50,6 +53,12 @@ data SiteConfig = SiteConfig {
 
     -- | Files to read metadata from
     metaYamlFile :: OsPath,
+
+    -- | File name of sitemap template (within templatesDir)
+    sitemapTemplateFile :: OsPath,
+
+    -- | Name of the generated sitemap file (within outputDir)
+    sitemapFile :: OsPath,
 
     -- | Destination directory of the rendered site
     outputDir :: OsPath,
@@ -85,6 +94,8 @@ defaultSiteConfig = SiteConfig {
     staticDir = [osp|static|],
     indexFileName = [osp|index|],
     metaYamlFile = [osp|meta.yaml|],
+    sitemapTemplateFile = [osp|sitemap.xml|],
+    sitemapFile = [osp|sitemap.xml|],
     outputDir = [osp|output|],
     requiredMetadata = HS.fromList [
         "base-url",
@@ -215,6 +226,7 @@ buildSite config = do
     let menu = buildMenu pages
     mapM_ (writePage config . addMenuToPage menu) pages
     copyStaticFiles config
+    makeSitemap config pages
 
 -- | Load all pages
 loadPages :: HasCallStack => SiteConfig -> Action [Page]
@@ -439,6 +451,25 @@ copyFileIfChanged source dest = liftIO $ do
         putStrLn $ "Copying file " <> (show source)
         createDirectoryIfMissing True (takeDirectory dest)
         copyFileWithMetadata source dest
+
+-- | Create a sitemap from a template
+makeSitemap :: SiteConfig -> [Page] -> Action ()
+makeSitemap config pages = do
+    template <- loadTemplate $! config.templatesDir </> config.sitemapTemplateFile
+    let metaList = fmap toSitemapMeta . filter (not . (.hidden)) $ pages
+        metaMap = M.singleton ("pages" :: T.Text) metaList
+        text = render Nothing $! renderTemplate template metaMap
+    writeTextFile (config.outputDir </> config.sitemapFile) text
+  where
+    toSitemapMeta :: Page -> M.Map T.Text T.Text
+    toSitemapMeta page
+        = let meta = getDocMeta $! page.doc
+          in M.fromList
+             [ ("url", escapeStringForXML page.url),
+               ("title", escapeStringForXML $! stringify page.menuTitle),
+               ("base-url", escapeStringForXML $! lookupMetaString "base-url" meta),
+               ("date", escapeStringForXML $! lookupMetaString "date-meta" meta)
+             ]
 
 -- | Make a RoseTrie from a directory tree
 makeDirectoryTrie :: OsPath -> Action (RoseTrie OsPath OsPath)
