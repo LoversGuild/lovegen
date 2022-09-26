@@ -5,7 +5,7 @@
 module Main (main) where
 
 import Control.Applicative (liftA2, (<|>))
-import Control.Monad (ap, filterM, when, unless)
+import Control.Monad (ap, filterM, void, unless, when)
 import Data.Bifunctor (second)
 import Data.Binary
 import Data.Bool (bool)
@@ -39,6 +39,9 @@ import LoveGen.Utils
 -------------------
 
 data SiteConfig = SiteConfig {
+    -- | Base URL of the site. This has to end with "/" or anything that uses this data will break.
+    siteUrl :: Url,
+
     -- | Directory containing Markdown pages.
     pagesDir :: OsPath,
 
@@ -89,6 +92,7 @@ data SiteConfig = SiteConfig {
 -- | Default site configuration
 defaultSiteConfig :: SiteConfig
 defaultSiteConfig = SiteConfig {
+    siteUrl = "http://localhost/",
     pagesDir = [osp|.|],
     templatesDir = [osp|templates|],
     staticDir = [osp|static|],
@@ -98,12 +102,13 @@ defaultSiteConfig = SiteConfig {
     sitemapFile = [osp|sitemap.xml|],
     outputDir = [osp|output|],
     requiredMetadata = HS.fromList [
-        "base-url",
+        "absolute-url",
         "date",
         "date-meta",
         "lang",
         "order",
         "site-root",
+        "site-url",
         "template",
         "title",
         "url"
@@ -138,6 +143,7 @@ defaultSiteConfig = SiteConfig {
 
 finnishSite :: SiteConfig
 finnishSite = defaultSiteConfig {
+    siteUrl = "https://rakastajienkilta.fi/",
     pagesDir = [osp|pages/fi|],
     outputDir = [osp|output/fi|],
     timeLocale = finnishTimeLocale,
@@ -163,6 +169,7 @@ finnishTimeLocale = TimeLocale {
 
 englishSite :: SiteConfig
 englishSite = defaultSiteConfig {
+    siteUrl = "https://loversguild.org/",
     pagesDir = [osp|pages/en|],
     outputDir = [osp|output/en|],
     dateFormat = "on %a, %d %b %Y"
@@ -179,6 +186,9 @@ data Page = Page {
 
     -- | URL split into path segments
     urlSegments :: [Url],
+
+    -- | Absolute URL of the page
+    absoluteUrl :: Url,
 
     -- | Contents and metadata
     doc :: Pandoc,
@@ -354,6 +364,7 @@ loadPage config meta fp = cacheAction ("page" :: T.Text, fp) do
     let url = if null urlSegments
             then "./"
             else (T.intercalate "/" urlSegments) <> "/"
+        absoluteUrl = config.siteUrl <> T.intercalate "/" urlSegments <> "/"
         rootUrlRelative =
             if null urlSegments
             then "./"
@@ -365,6 +376,8 @@ loadPage config meta fp = cacheAction ("page" :: T.Text, fp) do
 
     let doc' = flip modifyMeta doc $
                \m -> addMeta "site-root" (MetaString rootUrlRelative)
+                     . addMeta "site-url" (MetaString config.siteUrl)
+                     . addMeta "absolute-url" (MetaString absoluteUrl)
                      . addMeta "url" (MetaString url)
                      . addMeta "date-meta" (MetaString . T.pack $! iso8601Show time)
                      . addMeta "date" (MetaString . T.pack $! formatTime config.timeLocale (T.unpack config.dateFormat) time)
@@ -388,6 +401,7 @@ loadPage config meta fp = cacheAction ("page" :: T.Text, fp) do
     pure $! Page {
         url = url,
         urlSegments = urlSegments,
+        absoluteUrl = absoluteUrl,
         doc = doc',
         menuTitle = menuTitle,
         order = order,
@@ -428,7 +442,7 @@ copyStaticFiles config = do
     let staticSegmentsCount = length . splitDirectories $ config.staticDir
     files <- liftIO $! listDirectoryRecursive config.staticDir
              >>= filterM (liftIO . doesFileExist)
-    _ <- forP files \sourceFile ->
+    void $! forP files \sourceFile ->
         let pathSegments = drop staticSegmentsCount $! splitDirectories sourceFile
             destFile = joinPath $! config.outputDir : pathSegments
         in copyFileIfChanged sourceFile destFile
@@ -465,9 +479,8 @@ makeSitemap config pages = do
     toSitemapMeta page
         = let meta = getDocMeta $! page.doc
           in M.fromList
-             [ ("url", escapeStringForXML page.url),
+             [ ("absolute-url", escapeStringForXML page.absoluteUrl),
                ("title", escapeStringForXML $! stringify page.menuTitle),
-               ("base-url", escapeStringForXML $! lookupMetaString "base-url" meta),
                ("date", escapeStringForXML $! lookupMetaString "date-meta" meta)
              ]
 
