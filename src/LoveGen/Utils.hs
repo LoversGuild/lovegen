@@ -46,6 +46,7 @@ module LoveGen.Utils
         insertWithPath,
 
         -- * Time information management
+        fetchFirstCommitTime,
         fetchLastCommitTime
     )
 where
@@ -282,11 +283,19 @@ insertWithPath (p : ps) node forest
               <> (show forest)
 insertWithPath [] _ _ = error $! "Attempted to add an empty key into a RoseTrie"
 
--- | Fetch the last commit date of a file from git repository
-fetchLastCommitTime :: OsPath -> Action (Maybe UTCTime)
-fetchLastCommitTime fp = do
+-- | Fetch a commit datetime of a file from git repository
+fetchGitCommitTime :: [String] -> OsPath -> Action (Maybe UTCTime)
+fetchGitCommitTime gitOpts fp = do
     stringFP <- liftIO $! decodeFS fp
-    (code, out) <- readProcessStdout $! setEnv [("TZ", "UTC")] $! proc "git" ["log", "-1", "--format=%aI", "--", stringFP ]
+    (code, out) <- readProcessStdout $! setEnv [("TZ", "UTC")] $! proc "git" (["log", "-1", "--format=%aI" ] <> gitOpts <> [ "--", stringFP ])
     if code == ExitSuccess
         then pure $! Nothing
         else pure $! iso8601ParseM . T.unpack . decodeUtf8 . BL.toStrict $! out
+
+-- | Fetch the date and time of the first commit of a file
+fetchFirstCommitTime :: OsPath -> Action (Maybe UTCTime)
+fetchFirstCommitTime = fetchGitCommitTime [ "--diff-filter=A", "--follow", "--find-renames=40%" ]
+
+-- | Fetch the date and time of the latest commit of a file
+fetchLastCommitTime :: OsPath -> Action (Maybe UTCTime)
+fetchLastCommitTime = fetchGitCommitTime []
