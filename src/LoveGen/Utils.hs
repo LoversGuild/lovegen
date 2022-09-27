@@ -254,7 +254,7 @@ roseTrieFromList = roseTrieFromSortedList . sortOn (length . fst)
     roseTrieFromSortedList [] = error $ "Cannot create rose trie from empty item list."
     roseTrieFromSortedList (([], item) : rest)
         = TrieNode item $! rosesFromList rest
-    roseTrieFromSortedList list = error $ "No trie root element found in " <> (show list)
+    roseTrieFromSortedList list = error $ "No trie root element found among " <> (show $! map fst list)
 
     rosesFromList :: HasCallStack => [([k], a)] -> RoseForest k a
     rosesFromList = foldl' (flip $ uncurry insertWithPath) HM.empty
