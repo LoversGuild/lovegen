@@ -233,7 +233,7 @@ main = shakeArgsForward shakeOpts do
 buildSite :: SiteConfig -> Action ()
 buildSite config = do
     pages <- loadPages config
-    let menu = buildMenu pages
+    let menu = buildMenuTrie pages
     mapM_ (writePage config . addMenuToPage menu) pages
     copyStaticFiles config
     makeSitemap config pages
@@ -262,8 +262,8 @@ loadPages config = do
               forP (HM.elems subforest) (loadPagesRecursive combinedMeta) >>= pure . concat
 
 -- | Build a menu trie from all pages
-buildMenu :: [Page] -> MenuTrie
-buildMenu = roseTrieFromList . fmap toAssoc . filter (not . (.hidden))
+buildMenuTrie :: [Page] -> MenuTrie
+buildMenuTrie = roseTrieFromList . fmap toAssoc . filter (not . (.hidden))
   where
     -- Associate a page with its breadcrumb
     toAssoc :: Page -> ([Url], Page)
