@@ -9,6 +9,7 @@ module LoveGen.Utils
         -- URLs
         Url,
         osPathToUrl,
+        urlToOsPath,
 
         -- Monadic conditional
         ifM,
@@ -74,8 +75,15 @@ import Text.Pandoc
 -- | Type for storing URLs
 type Url = T.Text
 
+-- | Convert an OsPath to Url
 osPathToUrl :: OsPath -> Action Url
 osPathToUrl = liftIO . decodeFS >=> pure . T.pack
+
+-- | Convert an Url to OsPath
+urlToOsPath :: Url -> Action OsPath
+urlToOsPath url
+    | T.null url = pure $! [osp|.|]
+    | otherwise = liftIO . encodeFS . T.unpack $! url
 
 -- | Like if, but condition can be monadic
 ifM :: Monad m => m Bool -- ^ Conditional
@@ -236,19 +244,19 @@ singletonRoseTrie node = TrieNode node HM.empty
 
 -- | Convert a list of paths to nods into a RoseTrie
 roseTrieFromList
-    :: (HasCallStack, Hashable k, Show k, Show a)
+    :: forall a k. (HasCallStack, Hashable k, Show k, Show a)
     => [([k], a)] -> RoseTrie k a
 roseTrieFromList = roseTrieFromSortedList . sortOn (length . fst)
   where
     -- Extract root element from the sorted (path, item) list, construct the
     -- top node from it and pass the rest to the rose forest builder
-    -- roseTrieFromSortedList :: HasCallStack => [([k], a)] -> RoseTrie k a
+    roseTrieFromSortedList :: HasCallStack => [([k], a)] -> RoseTrie k a
     roseTrieFromSortedList [] = error $ "Cannot create rose trie from empty item list."
     roseTrieFromSortedList (([], item) : rest)
         = TrieNode item $! rosesFromList rest
     roseTrieFromSortedList list = error $ "No trie root element found in " <> (show list)
 
-    -- rosesFromList :: HasCallStack => [([k], a)] -> RoseForest k a
+    rosesFromList :: HasCallStack => [([k], a)] -> RoseForest k a
     rosesFromList = foldl' (flip $ uncurry insertWithPath) HM.empty
 
 -- | Extract the root item from a rose trie
