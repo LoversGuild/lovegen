@@ -36,6 +36,7 @@ executable lovegen
         bytestring ^>=0.11.3,
         containers ^>=0.6.6,
         directory ^>=1.3.8,
+        doclayout ^>=0.4,
         doctemplates ^>=0.10,
         file-io ^>=0.1,
         filepath ^>=1.4.100,
