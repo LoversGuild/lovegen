@@ -5,7 +5,7 @@
 module Main (main) where
 
 import Control.Applicative (liftA2, (<|>))
-import Control.Monad (ap, filterM, void, unless, when)
+import Control.Monad (ap, filterM, void, when)
 import Data.Bifunctor (second)
 import Data.Binary
 import Data.Bool (bool)
@@ -51,7 +51,7 @@ data SiteConfig = SiteConfig {
     -- | Static files' directory
     staticDir :: OsPath,
 
-    -- | Name of the index file (without extension)
+    -- | Name of the index file (including extension)
     indexFileName :: OsPath,
 
     -- | Files to read metadata from
@@ -96,7 +96,7 @@ defaultSiteConfig = SiteConfig {
     pagesDir = [osp|.|],
     templatesDir = [osp|templates|],
     staticDir = [osp|static|],
-    indexFileName = [osp|index|],
+    indexFileName = [osp|index.html|],
     metaYamlFile = [osp|meta.yaml|],
     sitemapTemplateFile = [osp|sitemap.xml|],
     sitemapFile = [osp|sitemap.xml|],
@@ -352,19 +352,24 @@ loadPage config meta fp = cacheAction ("page" :: T.Text, fp) do
     -- Metadata handling
     let pagesDirSegments = splitDirectories $! config.pagesDir
         pagesDirSegmentsCount = length pagesDirSegments
-        (contentDirs, pathSegments) = splitAt pagesDirSegmentsCount $! splitDirectories . dropExtension $! fp
-        destPathSegments =
-            if last pathSegments == config.indexFileName
-            then init pathSegments
-            else pathSegments
-        destFile = config.outputDir </> (joinPath destPathSegments) </> config.indexFileName <.> [osp|html|]
 
-    unless (contentDirs == pagesDirSegments) $ fail $! "Page file name " <> (show fp) <> " does not start with page directory " <> (show config.pagesDir)
-    urlSegments <- mapM osPathToUrl destPathSegments
-    let url = if null urlSegments
-            then "./"
-            else (T.intercalate "/" urlSegments) <> "/"
-        absoluteUrl = config.siteUrl <> T.intercalate "/" urlSegments <> "/"
+    -- Calculate relative url and base target file name either based on the
+    -- page file name or the "url" metadata field. Avoid extraneous
+    -- encoding/decoding of the file name.
+    (url, baseDestFile) <- case lookupMeta "url" $! getDocMeta doc of
+        Just metaUrl -> do
+            let urlTrimmed = T.dropAround (== '/') . stringify $! metaUrl
+                urlSlashed = if T.null urlTrimmed then "" else urlTrimmed <> "/"
+            dest' <- urlToOsPath urlSlashed
+            pure $! (urlSlashed, dest')
+        Nothing -> do
+            let dest' = joinPath . drop pagesDirSegmentsCount . splitDirectories . dropExtension $! fp
+            url' <- osPathToUrl dest'
+            pure $! (url' <> "/", dest')
+
+    let destFile = normalise $! config.outputDir </> baseDestFile </> config.indexFileName
+        urlSegments = filter (not . T.null) . T.split (== '/') $! url
+        absoluteUrl = config.siteUrl <> url
         rootUrlRelative =
             if null urlSegments
             then "./"
@@ -378,7 +383,7 @@ loadPage config meta fp = cacheAction ("page" :: T.Text, fp) do
                \m -> addMeta "site-root" (MetaString rootUrlRelative)
                      . addMeta "site-url" (MetaString config.siteUrl)
                      . addMeta "absolute-url" (MetaString absoluteUrl)
-                     . addMeta "url" (MetaString url)
+                     . addMeta "url" (MetaString if T.null url then "./" else url)
                      . addMeta "date-meta" (MetaString . T.pack $! iso8601Show time)
                      . addMeta "date" (MetaString . T.pack $! formatTime config.timeLocale (T.unpack config.dateFormat) time)
                      $! metaUnion m meta
