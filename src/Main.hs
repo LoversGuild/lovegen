@@ -115,6 +115,8 @@ defaultSiteConfig = SiteConfig {
     ],
     optionalMetadata = HS.fromList [
         "abstract",
+        "creation-date",
+        "creation-date-meta",
         "description",
         "hidden",
         "indexing",
