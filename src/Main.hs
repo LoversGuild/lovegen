@@ -378,6 +378,7 @@ loadPage config meta fp = cacheAction ("page" :: T.Text, fp) do
     time <- fetchLastCommitTime fp >>= \case
         Just t -> pure $! t
         Nothing -> liftIO $! getModificationTime fp
+    creationTime <- fetchFirstCommitTime fp >>= pure . fromMaybe time
 
     let doc' = flip modifyMeta doc $
                \m -> addMeta "site-root" (MetaString rootUrlRelative)
@@ -386,6 +387,8 @@ loadPage config meta fp = cacheAction ("page" :: T.Text, fp) do
                      . addMeta "url" (MetaString if T.null url then "./" else url)
                      . addMeta "date-meta" (MetaString . T.pack $! iso8601Show time)
                      . addMeta "date" (MetaString . T.pack $! formatTime config.timeLocale (T.unpack config.dateFormat) time)
+                     . addMeta "creation-date-meta" (MetaString . T.pack $! iso8601Show creationTime)
+                     . addMeta "creation-date" (MetaString . T.pack $! formatTime config.timeLocale (T.unpack config.dateFormat) creationTime)
                      $! metaUnion m meta
         meta' = getDocMeta doc'
 
