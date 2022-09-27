@@ -475,7 +475,7 @@ copyFileIfChanged source dest = liftIO $ do
 makeSitemap :: SiteConfig -> [Page] -> Action ()
 makeSitemap config pages = do
     template <- loadTemplate $! config.templatesDir </> config.sitemapTemplateFile
-    let metaList = fmap toSitemapMeta . filter (not . (.hidden)) $ pages
+    let metaList = fmap toSitemapMeta . sortOn (.url) . filter (not . (.hidden)) $! pages
         metaMap = M.singleton ("pages" :: T.Text) metaList
         text = render Nothing $! renderTemplate template metaMap
     writeTextFile (config.outputDir </> config.sitemapFile) text
