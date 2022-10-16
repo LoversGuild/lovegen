@@ -331,7 +331,7 @@ buildMenuForPath initialPath initialMenu
         nextMenuLevels (p : ps)
             = case HM.lookup p submenu of
                   Just subtrie -> buildMenuLevels ps subtrie (level + 1)
-                  Nothing -> error $ "Unknown menu item " <> (show p) <> " in menu path " <> (show initialPath)
+                  Nothing -> [] -- Rest of the path is probably hidden
 
     -- Relative URL of the root page of the whole site
     rootRelative :: Url
