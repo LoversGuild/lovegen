@@ -8,7 +8,6 @@
 module LoveGen.Orphans () where
 
 import Data.Binary
-import Data.Hashable
 import Data.Text qualified as T
 import System.OsPath
 import System.OsPath.Posix (PosixString)
@@ -48,6 +47,7 @@ instance Binary DT.Variable
 instance Binary (Template T.Text)
 
 instance Binary CiteMethod
+instance Binary Extension
 instance Binary Extensions
 instance Binary ObfuscationMethod
 instance Binary HTMLMathMethod
@@ -62,6 +62,3 @@ instance Binary WrapOption
    
 instance Binary PosixString
 instance Binary OsString
-
-instance Hashable PosixString
-instance Hashable OsString
