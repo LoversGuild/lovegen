@@ -31,7 +31,7 @@ flag Weverything
 
 executable lovegen
     build-depends:
-        base ^>={ 4.16, 4.17 },
+        base ^>={ 4.17, 4.18 },
         binary ^>={ 0.8, 0.9, 0.10 },
         bytestring ^>=0.11.3,
         containers ^>=0.6.6,
@@ -41,7 +41,7 @@ executable lovegen
         file-io ^>=0.1,
         filepath ^>=1.4.100,
         hashable ^>=1.4.2,
-        pandoc ^>=3.0,
+        pandoc ^>=3.1.2,
         shake ^>=0.19.6,
         text ^>=2.0,
         time ^>={ 1.12, 1.13 },
