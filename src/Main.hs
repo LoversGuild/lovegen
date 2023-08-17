@@ -4,7 +4,7 @@
 
 module Main (main) where
 
-import Control.Applicative (liftA2, (<|>))
+import Control.Applicative ((<|>))
 import Control.Monad (ap, filterM, void, when)
 import Data.Bifunctor (second)
 import Data.Binary
