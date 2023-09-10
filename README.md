@@ -24,12 +24,6 @@ We may well change our template language in the future.
 
 # Building
 
-Building LoveGen is (at the moment) a bit hacky.
-This is due to the new Abstract FilePath Proposal landing in the Haskell ecosystem.
-Most of the packages don't yet support abstract file paths nor do they compile with some upgraded dependencies.
-
-LoveGen makes heavy use of abstract file paths, and therefore we have needed to patch some of the indirect dependencies of the generator.
-
 To build LoveGen, you need to have GHC >=9.4 installed.
 You also need cabal-install >=3.8 – no stack build files are provided.
 The best way to install these tools is probably with
@@ -37,17 +31,12 @@ The best way to install these tools is probably with
 
 [ghcup]: https://www.haskell.org/ghcup/
 
-To facilitate building this software, we ship `cabal.project` and `cabal.project.freeze` files which must be present in the build directory when running cabal.
-
-For building, we recommend doing the following cabal configuration:
+To build LoveGen,, run:
 
 ```sh
-$ cabal configure --no-upgrade-dependencies --allow-newer=base,directory,filepath,unix -fWeverything
+$ cabal build
 ```
 
-This will create a `cabal.project.local`file which stores the provided settings, so that they don't need to be repeated with every cabal command.
-
-To build LoveGen, you can then run `cabal build`.
 To install LoveGen to `$HOME/.cabal/bin` (or whatever your Cabal's configured `bin` directory is), run `cabal install`.
 
 # Usage
