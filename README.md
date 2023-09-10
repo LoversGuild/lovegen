@@ -25,9 +25,8 @@ We may well change our template language in the future.
 # Building
 
 To build LoveGen, you need to have GHC >=9.4 installed.
-You also need cabal-install >=3.8 – no stack build files are provided.
-The best way to install these tools is probably with
-[GHCup][ghcup].
+You also need cabal-install >=3.8.
+The best way to install these tools is probably with [GHCup][ghcup].
 
 [ghcup]: https://www.haskell.org/ghcup/
 
@@ -71,8 +70,6 @@ The build system also stores cache data to the `shake/` directory.
 The generator uses `Development.Shake.Forward` module for tracking build dependencies.
 This does not work very well yet (probably due to some misconfiguration on our side).
 As a result, you may occasionally need to `rm -rf output shake` after editing the site contents.
-Sometimes the build fails noisily if the dependency tracking fails.
-Sometimes though, you'll just get an incomplete or incorrectly rendered site.
 
 # Hacking
 
