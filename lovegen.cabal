@@ -33,19 +33,19 @@ flag Weverything
 
 executable lovegen
     build-depends:
-        base ^>={ 4.17, 4.18 },
+        base ^>={ 4.17, 4.18, 4.19 },
         binary ^>={ 0.8, 0.9, 0.10 },
         bytestring ^>= { 0.11.3, 0.12 },
-        containers ^>=0.6.6,
+        containers ^>={ 0.6.6, 0.7 },
         directory ^>=1.3.8,
         doclayout ^>=0.4,
         doctemplates ^>=0.11,
         file-io ^>=0.1,
-        filepath ^>=1.4.100,
+        filepath ^>={ 1.4.100, 1.5 },
         hashable ^>=1.4.2,
         pandoc ^>=3.1.2,
         shake ^>=0.19.6,
-        text ^>=2.0,
+        text ^>={ 2.0, 2.1 },
         time ^>={ 1.12, 1.13 },
         typed-process ^>=0.2.10,
         unordered-containers ^>=0.2.19.1
@@ -81,6 +81,7 @@ executable lovegen
             -Wno-missed-specialisations
             -Wno-missing-import-lists
             -Wno-missing-kind-signatures
+            -Wno-missing-role-annotations
             -Wno-missing-safe-haskell-mode
             -Wno-monomorphism-restriction
             -Wno-safe
