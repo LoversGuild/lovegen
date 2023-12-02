@@ -10,6 +10,7 @@ The sources for the site can be found on GitHub [here][web-repo].
 [web-repo]: https://github.com/LoversGuild/websites
 
 LoveGen is more or less a general-purpose static site generator.
+Its defining feature is support for hierarchical menus in generated pages.
 Its general usefulness is somewhat limited though by the fact that it has a built-in configuration.
 This will hopefully change soon.
 
@@ -30,13 +31,18 @@ The best way to install these tools is probably with [GHCup][ghcup].
 
 [ghcup]: https://www.haskell.org/ghcup/
 
-To build LoveGen,, run:
+To build LoveGen, run:
 
 ```sh
 $ cabal build
 ```
 
 To install LoveGen to `$HOME/.cabal/bin` (or whatever your Cabal's configured `bin` directory is), run `cabal install`.
+
+**Note:**
+
+With GHC 9.8 you currently need to pass `--allow-newer=base,text` to Cabal while building/installing as not all our dependencies have been updated to work with GHC 9.8.
+Despite of this, the build works well.
 
 # Usage
 
