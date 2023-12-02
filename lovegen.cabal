@@ -1,12 +1,14 @@
 cabal-version: 3.0
 name: lovegen
 version: 0.1.0.0
-synopsis: The website of Lovers' Guild
+synopsis: A simple static website generator for Haskell by Lover's Guild
 description:
     Generate love, not war!
 
-    This Haskell executable generates the website of Lovers' Guild.
-homepage: https://github.com/LoversGuild/website
+    This is a Haskell tool for statically generating websites.
+    Its defining feature is support for hierarchical menus.
+    See README.md in source repository for documentation.
+homepage: https://github.com/LoversGuild/lovegen
 license: AGPL-3.0-only
 license-file: LICENSE
 author: Lovers' Guild
@@ -17,7 +19,7 @@ extra-source-files:
 
 source-repository head
     type: git
-    location: https://github.com/LoversGuild/website.git
+    location: https://github.com/LoversGuild/lovegen
                       
 flag Werror
     description: Enable -Werror for fixing all warnings
