@@ -161,7 +161,7 @@ renderPandoc writer doc
 -- | Run Pandoc inside shake
 runPandocAction :: PandocIO a -> Action a
 runPandocAction
-    = (liftIO . runIO >=> either (fail . show) pure)
+    = liftIO . runIO >=> either (fail . show) pure
 
 -- metaToJson :: PandocWriter -> Meta -> Action A.Value
 -- metaToJson writer (Meta meta)
@@ -193,11 +193,9 @@ verifyMetaKeys required optional (Meta mmap)
           desired = HS.union optional required
           missing = HS.difference required present
           surplus = HS.difference present desired
-      in if not $! HS.null missing && HS.null surplus
-         then error $! "Metadata verification failed -"
-              <> " missing keys: " <> (show missing)
-              <> ", excess keys: " <> (show surplus)
-         else pure $! ()
+      in (when (not $! HS.null missing && HS.null surplus) $ error $! "Metadata verification failed -"
+              <> " missing keys: " <> show missing
+              <> ", excess keys: " <> show surplus)
 
 -- | Extract metadata from a Pandoc document
 getDocMeta :: Pandoc -> Meta
@@ -230,7 +228,7 @@ lookupMetaForce key meta
     = case lookupMeta key meta of
           Just val -> val
           Nothing ->
-              error $ "Required metadata key " <> (show key) <> " was not found from metadata: " <> (show meta)
+              error $ "Required metadata key " <> show key <> " was not found from metadata: " <> show meta
 
 -- | Rose trie and map data structure using hashmaps
 data RoseTrie k a = TrieNode a (RoseForest k a)
@@ -252,10 +250,10 @@ roseTrieFromList = roseTrieFromSortedList . sortOn (length . fst)
     -- Extract root element from the sorted (path, item) list, construct the
     -- top node from it and pass the rest to the rose forest builder
     roseTrieFromSortedList :: HasCallStack => [([k], a)] -> RoseTrie k a
-    roseTrieFromSortedList [] = error $ "Cannot create rose trie from empty item list."
+    roseTrieFromSortedList [] = error "Cannot create rose trie from empty item list."
     roseTrieFromSortedList (([], item) : rest)
         = TrieNode item $! rosesFromList rest
-    roseTrieFromSortedList list = error $ "No trie root element found among " <> (show $! map fst list)
+    roseTrieFromSortedList list = error $ "No trie root element found among " <> (show $! fmap fst list)
 
     rosesFromList :: HasCallStack => [([k], a)] -> RoseForest k a
     rosesFromList = foldl' (flip $ uncurry insertWithPath) HM.empty
@@ -280,7 +278,7 @@ insertWithPath (p : ps) node forest
           Nothing ->
               error $! "Attempting to insert a node into a RoseTrie with too long path "
               <> (show $! p : ps) <> " -- map is "
-              <> (show forest)
+              <> show forest
 insertWithPath [] _ _ = error $! "Attempted to add an empty key into a RoseTrie"
 
 -- | Fetch a commit datetime of a file from git repository
@@ -289,7 +287,7 @@ fetchGitCommitTime gitOpts fp = do
     stringFP <- liftIO $! decodeFS fp
     (code, out) <- readProcessStdout $! setEnv [("TZ", "UTC")] $! proc "git" (["log", "-1", "--format=%aI" ] <> gitOpts <> [ "--", stringFP ])
     if code == ExitSuccess
-        then pure $! Nothing
+        then pure Nothing
         else pure $! iso8601ParseM . T.unpack . decodeUtf8 . BL.toStrict $! out
 
 -- | Fetch the date and time of the first commit of a file

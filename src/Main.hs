@@ -9,6 +9,7 @@ import Control.Monad (ap, filterM, void, when)
 import Data.Bifunctor (second)
 import Data.Binary
 import Data.Bool (bool)
+import Data.Functor ((<&>))
 import Data.HashMap.Strict qualified as HM
 import Data.HashSet qualified as HS
 import Data.List (sortOn)
@@ -156,11 +157,9 @@ finnishSite = defaultSiteConfig {
 -- | Finnish time locale
 finnishTimeLocale :: TimeLocale
 finnishTimeLocale = TimeLocale {
-    wDays = fmap (ap (,) (take 2))
-            $ [ "sunnuntai", "maanantai", "tiistai", "keskiviikko",
+    wDays = ap (,) (take 2) <$> [ "sunnuntai", "maanantai", "tiistai", "keskiviikko",
                 "torstai", "perjantai", "lauantai" ],
-    months = fmap ((,) =<< (<> "kuu"))
-             $ [ "tammi", "helmi", "maalis", "huhti", "touko", "kesä",
+    months = ((,) =<< (<> "kuu")) <$> [ "tammi", "helmi", "maalis", "huhti", "touko", "kesä",
                  "heinä", "elo", "syys", "loka", "marras", "joulu" ],
     amPm = ("ennen puoltapäivää", "puolen päivän jälkeen"),
     dateTimeFmt = "%d.%m.%Y %H:%M:%S",
@@ -262,7 +261,7 @@ loadPages config = do
               meta' <- liftIO (doesFileExist metaYamlFile)
                   >>= bool (pure nullMeta) (loadYamlMeta config metaYamlFile)
               let combinedMeta = metaUnion meta' meta
-              forP (HM.elems subforest) (loadPagesRecursive combinedMeta) >>= pure . concat
+              forP (HM.elems subforest) (loadPagesRecursive combinedMeta) <&> concat
 
 -- | Build a menu trie from all pages
 buildMenuTrie :: [Page] -> MenuTrie
@@ -349,8 +348,8 @@ buildMenuForPath initialPath initialMenu
 -- | Load a single page from a Markdown file
 loadPage :: HasCallStack => SiteConfig -> Meta -> OsPath -> Action Page
 loadPage config meta fp = cacheAction ("page" :: T.Text, fp) do
-    liftIO . putStrLn $ "Loading page " <> (show fp)
-    doc <- readMarkdownFile config fp >>= pure . headerShift config.shiftHeaders
+    liftIO . putStrLn $ "Loading page " <> show fp
+    doc <- readMarkdownFile config fp <&> (headerShift config.shiftHeaders)
 
     -- Metadata handling
     let pagesDirSegments = splitDirectories $! config.pagesDir
@@ -364,11 +363,11 @@ loadPage config meta fp = cacheAction ("page" :: T.Text, fp) do
             let urlTrimmed = T.dropAround (== '/') . stringify $! metaUrl
                 urlSlashed = if T.null urlTrimmed then "" else urlTrimmed <> "/"
             dest' <- urlToOsPath urlSlashed
-            pure $! (urlSlashed, dest')
+            pure (urlSlashed, dest')
         Nothing -> do
             let dest' = joinPath . drop pagesDirSegmentsCount . splitDirectories . dropExtension $! fp
             url' <- osPathToUrl dest'
-            pure $! (url' <> "/", dest')
+            pure (url' <> "/", dest')
 
     let destFile = normalise $! config.outputDir </> baseDestFile </> config.indexFileName
         urlSegments = filter (not . T.null) . T.split (== '/') $! url
@@ -381,7 +380,7 @@ loadPage config meta fp = cacheAction ("page" :: T.Text, fp) do
     time <- fetchLastCommitTime fp >>= \case
         Just t -> pure $! t
         Nothing -> liftIO $! getModificationTime fp
-    creationTime <- fetchFirstCommitTime fp >>= pure . fromMaybe time
+    creationTime <- fetchFirstCommitTime fp <&> fromMaybe time
 
     let doc' = flip modifyMeta doc $
                \m -> addMeta "site-root" (MetaString rootUrlRelative)
@@ -404,7 +403,7 @@ loadPage config meta fp = cacheAction ("page" :: T.Text, fp) do
         hidden = case lookupMeta "hidden" meta' of
                      Just (MetaBool val) -> val
                      Nothing -> False
-                     val -> error $ "Invalid value for meta key 'hidden': " <> (show val)
+                     val -> error $ "Invalid value for meta key 'hidden': " <> show val
 
     templateFile <- (liftIO . encodeFS) . T.unpack . stringify . lookupMetaForce "template" $ meta'
     template <- loadTemplate $! config.templatesDir </> templateFile
@@ -469,11 +468,10 @@ copyFileIfChanged source dest = liftIO $ do
     -- Check if the file needs to be copied
     doCopy <- ifM (not <$> doesFileExist dest) (pure True)
               $ ifM (liftA2 (/=) (getFileSize source) (getFileSize dest)) (pure True)
-              $ ifM (liftA2 (/=) (getModificationTime source) (getModificationTime dest)) (pure True)
-              $ (pure False)
+              $ ifM (liftA2 (/=) (getModificationTime source) (getModificationTime dest)) (pure True) (pure False)
 
     when doCopy $ do
-        putStrLn $ "Copying file " <> (show source)
+        putStrLn $ "Copying file " <> show source
         createDirectoryIfMissing True (takeDirectory dest)
         copyFileWithMetadata source dest
 
@@ -499,5 +497,4 @@ makeSitemap config pages = do
 makeDirectoryTrie :: OsPath -> Action (RoseTrie OsPath OsPath)
 makeDirectoryTrie rootDir
     = let prefixLength = length $! splitDirectories rootDir
-      in liftIO (listDirectoryRecursive rootDir)
-         >>= pure . roseTrieFromList . fmap (\p -> (drop prefixLength $! splitDirectories p, p))
+      in (liftIO (listDirectoryRecursive rootDir) <&> (roseTrieFromList . fmap (\p -> (drop prefixLength $! splitDirectories p, p))))
