@@ -1,7 +1,6 @@
 -- | Generate love, not war!
 --
 -- This is the main module of Lover's Guild's static website generator.
-
 module Main (main) where
 
 import Control.Applicative ((<|>))
@@ -39,176 +38,181 @@ import LoveGen.Utils
 -- Configuration --
 -------------------
 
-data SiteConfig = SiteConfig {
-    -- | Base URL of the site. This has to end with "/" or anything that uses this data will break.
-    siteUrl :: Url,
-
-    -- | Directory containing Markdown pages.
-    pagesDir :: OsPath,
-
-    -- | Directory of template files
-    templatesDir :: OsPath,
-
-    -- | Static files' directory
-    staticDir :: OsPath,
-
-    -- | Name of the index file (including extension)
-    indexFileName :: OsPath,
-
-    -- | Files to read metadata from
-    metaYamlFile :: OsPath,
-
-    -- | File name of sitemap template (within templatesDir)
-    sitemapTemplateFile :: OsPath,
-
-    -- | Name of the generated sitemap file (within outputDir)
-    sitemapFile :: OsPath,
-
-    -- | Destination directory of the rendered site
-    outputDir :: OsPath,
-
-    -- | A set of required metadata keys for each page
-    requiredMetadata :: HS.HashSet T.Text,
-
-    -- | A set of optional metadata keys for each page
-    optionalMetadata :: HS.HashSet T.Text,
-
-    -- | Amount of heading levels to shift all heading elements
-    shiftHeaders :: Int,
-
-    -- | Markdown reader options
-    markdownReaderOptions :: ReaderOptions,
-
-    -- | HTML writer options
-    htmlWriterOptions :: WriterOptions,
-
-    -- | Time locale settings
-    timeLocale :: TimeLocale,
-
-    -- | Default time format string
-    dateFormat :: T.Text
+data SiteConfig = SiteConfig
+    { -- | Base URL of the site. This has to end with "/" or anything that uses this data will break.
+      siteUrl :: Url,
+      -- | Directory containing Markdown pages.
+      pagesDir :: OsPath,
+      -- | Directory of template files
+      templatesDir :: OsPath,
+      -- | Static files' directory
+      staticDir :: OsPath,
+      -- | Name of the index file (including extension)
+      indexFileName :: OsPath,
+      -- | Files to read metadata from
+      metaYamlFile :: OsPath,
+      -- | File name of sitemap template (within templatesDir)
+      sitemapTemplateFile :: OsPath,
+      -- | Name of the generated sitemap file (within outputDir)
+      sitemapFile :: OsPath,
+      -- | Destination directory of the rendered site
+      outputDir :: OsPath,
+      -- | A set of required metadata keys for each page
+      requiredMetadata :: HS.HashSet T.Text,
+      -- | A set of optional metadata keys for each page
+      optionalMetadata :: HS.HashSet T.Text,
+      -- | Amount of heading levels to shift all heading elements
+      shiftHeaders :: Int,
+      -- | Markdown reader options
+      markdownReaderOptions :: ReaderOptions,
+      -- | HTML writer options
+      htmlWriterOptions :: WriterOptions,
+      -- | Time locale settings
+      timeLocale :: TimeLocale,
+      -- | Default time format string
+      dateFormat :: T.Text
     }
     deriving stock (Show)
 
 -- | Default site configuration
 defaultSiteConfig :: SiteConfig
-defaultSiteConfig = SiteConfig {
-    siteUrl = "http://localhost/",
-    pagesDir = [osp|.|],
-    templatesDir = [osp|templates|],
-    staticDir = [osp|static|],
-    indexFileName = [osp|index.html|],
-    metaYamlFile = [osp|meta.yaml|],
-    sitemapTemplateFile = [osp|sitemap.xml|],
-    sitemapFile = [osp|sitemap.xml|],
-    outputDir = [osp|output|],
-    requiredMetadata = HS.fromList [
-        "absolute-url",
-        "date",
-        "date-meta",
-        "lang",
-        "order",
-        "site-root",
-        "site-url",
-        "template",
-        "title",
-        "url"
-    ],
-    optionalMetadata = HS.fromList [
-        "abstract",
-        "abstract-title",
-        "creation-date",
-        "creation-date-meta",
-        "description",
-        "hidden",
-        "indexing",
-        "keywords",
-        "menu-title",
-        "page-title",
-        "strings",
-        "subtitle",
-        "title-prefix",
-        "title-suffix",
-        "toc"
-    ],
-    shiftHeaders = 1,
-    markdownReaderOptions = def { readerExtensions = pandocExtensions },
-    htmlWriterOptions = def {
-        writerEmailObfuscation = ReferenceObfuscation,
-        writerHtmlQTags = True,
-        writerNumberSections = False,
-        writerTableOfContents = True,
-        writerTemplate = Nothing,
-        writerTOCDepth = 2
-    },
-    timeLocale = defaultTimeLocale,
-    dateFormat = "%Y-%m-%d"
-}
+defaultSiteConfig =
+    SiteConfig
+        { siteUrl = "http://localhost/",
+          pagesDir = [osp|.|],
+          templatesDir = [osp|templates|],
+          staticDir = [osp|static|],
+          indexFileName = [osp|index.html|],
+          metaYamlFile = [osp|meta.yaml|],
+          sitemapTemplateFile = [osp|sitemap.xml|],
+          sitemapFile = [osp|sitemap.xml|],
+          outputDir = [osp|output|],
+          requiredMetadata =
+            HS.fromList
+                [ "absolute-url",
+                  "date",
+                  "date-meta",
+                  "lang",
+                  "order",
+                  "site-root",
+                  "site-url",
+                  "template",
+                  "title",
+                  "url"
+                ],
+          optionalMetadata =
+            HS.fromList
+                [ "abstract",
+                  "abstract-title",
+                  "creation-date",
+                  "creation-date-meta",
+                  "description",
+                  "hidden",
+                  "indexing",
+                  "keywords",
+                  "menu-title",
+                  "page-title",
+                  "strings",
+                  "subtitle",
+                  "title-prefix",
+                  "title-suffix",
+                  "toc"
+                ],
+          shiftHeaders = 1,
+          markdownReaderOptions = def {readerExtensions = pandocExtensions},
+          htmlWriterOptions =
+            def
+                { writerEmailObfuscation = ReferenceObfuscation,
+                  writerHtmlQTags = True,
+                  writerNumberSections = False,
+                  writerTableOfContents = True,
+                  writerTemplate = Nothing,
+                  writerTOCDepth = 2
+                },
+          timeLocale = defaultTimeLocale,
+          dateFormat = "%Y-%m-%d"
+        }
 
 finnishSite :: SiteConfig
-finnishSite = defaultSiteConfig {
-    siteUrl = "https://rakastajienkilta.fi/",
-    pagesDir = [osp|pages/fi|],
-    outputDir = [osp|output/fi|],
-    timeLocale = finnishTimeLocale,
-    dateFormat = "%Ana %d. %Bta %Y"
-}
+finnishSite =
+    defaultSiteConfig
+        { siteUrl = "https://rakastajienkilta.fi/",
+          pagesDir = [osp|pages/fi|],
+          outputDir = [osp|output/fi|],
+          timeLocale = finnishTimeLocale,
+          dateFormat = "%Ana %d. %Bta %Y"
+        }
 
 -- | Finnish time locale
 finnishTimeLocale :: TimeLocale
-finnishTimeLocale = TimeLocale {
-    wDays = ap (,) (take 2) <$> [ "sunnuntai", "maanantai", "tiistai", "keskiviikko",
-                "torstai", "perjantai", "lauantai" ],
-    months = ((,) =<< (<> "kuu")) <$> [ "tammi", "helmi", "maalis", "huhti", "touko", "kesä",
-                 "heinä", "elo", "syys", "loka", "marras", "joulu" ],
-    amPm = ("ennen puoltapäivää", "puolen päivän jälkeen"),
-    dateTimeFmt = "%d.%m.%Y %H:%M:%S",
-    dateFmt = "%d.%m.%Y",
-    timeFmt = "%H:%M:%S",
-    time12Fmt = "%H:%M:%S",
-    knownTimeZones = []
-}
+finnishTimeLocale =
+    TimeLocale
+        { wDays =
+            ap (,) (take 2)
+                <$> [ "sunnuntai",
+                      "maanantai",
+                      "tiistai",
+                      "keskiviikko",
+                      "torstai",
+                      "perjantai",
+                      "lauantai"
+                    ],
+          months =
+            ((,) =<< (<> "kuu"))
+                <$> [ "tammi",
+                      "helmi",
+                      "maalis",
+                      "huhti",
+                      "touko",
+                      "kesä",
+                      "heinä",
+                      "elo",
+                      "syys",
+                      "loka",
+                      "marras",
+                      "joulu"
+                    ],
+          amPm = ("ennen puoltapäivää", "puolen päivän jälkeen"),
+          dateTimeFmt = "%d.%m.%Y %H:%M:%S",
+          dateFmt = "%d.%m.%Y",
+          timeFmt = "%H:%M:%S",
+          time12Fmt = "%H:%M:%S",
+          knownTimeZones = []
+        }
 
 englishSite :: SiteConfig
-englishSite = defaultSiteConfig {
-    siteUrl = "https://loversguild.org/",
-    pagesDir = [osp|pages/en|],
-    outputDir = [osp|output/en|],
-    dateFormat = "on %a, %d %b %Y"
-}
+englishSite =
+    defaultSiteConfig
+        { siteUrl = "https://loversguild.org/",
+          pagesDir = [osp|pages/en|],
+          outputDir = [osp|output/en|],
+          dateFormat = "on %a, %d %b %Y"
+        }
 
 --------------------------
 -- End of Configuration --
 --------------------------
 
 -- | Data stored off a single page
-data Page = Page {
-    -- | URL fragment
-    url :: Url,
-
-    -- | URL split into path segments
-    urlSegments :: [Url],
-
-    -- | Absolute URL of the page
-    absoluteUrl :: Url,
-
-    -- | Contents and metadata
-    doc :: Pandoc,
-
-    -- | Title of the page in a menu
-    menuTitle :: MetaValue,
-
-    -- | Sorting score for the page in a menu
-    order :: Int,
-
-    -- | Is this page hidden from menus
-    hidden :: Bool,
-
-    -- | Template that is to be used to render this page
-    template :: Template T.Text,
-
-    -- | Name of the destination file
-    destFile :: OsPath
+data Page = Page
+    { -- | URL fragment
+      url :: Url,
+      -- | URL split into path segments
+      urlSegments :: [Url],
+      -- | Absolute URL of the page
+      absoluteUrl :: Url,
+      -- | Contents and metadata
+      doc :: Pandoc,
+      -- | Title of the page in a menu
+      menuTitle :: MetaValue,
+      -- | Sorting score for the page in a menu
+      order :: Int,
+      -- | Is this page hidden from menus
+      hidden :: Bool,
+      -- | Template that is to be used to render this page
+      template :: Template T.Text,
+      -- | Name of the destination file
+      destFile :: OsPath
     }
     deriving stock (Eq, Generic, Show)
     deriving anyclass (Binary)
@@ -223,13 +227,14 @@ main = shakeArgsForward shakeOpts do
     buildSite englishSite
   where
     shakeOpts :: ShakeOptions
-    shakeOpts = shakeOptions {
-                    shakeFiles = "shake",
-                    shakeLint = Just LintBasic,
-                    shakeLintInside = ["."],
-                    shakeThreads = 0,
-                    shakeVerbosity = Chatty
-                }
+    shakeOpts =
+        shakeOptions
+            { shakeFiles = "shake",
+              shakeLint = Just LintBasic,
+              shakeLintInside = ["."],
+              shakeThreads = 0,
+              shakeVerbosity = Chatty
+            }
 
 -- | Build a website
 buildSite :: SiteConfig -> Action ()
@@ -250,18 +255,19 @@ loadPages config = do
     loadPagesRecursive :: Meta -> RoseTrie OsPath OsPath -> Action [Page]
     loadPagesRecursive meta (TrieNode path subforest)
         | HM.null subforest = do
-              -- This might be a file = do
-              isFile <- liftIO $! doesFileExist path
-              if isFile && isExtensionOf [osp|md|] path
-                  then fmap (: []) $! loadPage config meta path
-                  else pure []
+            -- This might be a file
+            isFile <- liftIO $! doesFileExist path
+            if isFile && isExtensionOf [osp|md|] path
+                then fmap (: []) $! loadPage config meta path
+                else pure []
         | otherwise = do
-              -- This is a directory
-              let metaYamlFile = path </> config.metaYamlFile
-              meta' <- liftIO (doesFileExist metaYamlFile)
-                  >>= bool (pure nullMeta) (loadYamlMeta config metaYamlFile)
-              let combinedMeta = metaUnion meta' meta
-              forP (HM.elems subforest) (loadPagesRecursive combinedMeta) <&> concat
+            -- This is a directory
+            let metaYamlFile = path </> config.metaYamlFile
+            meta' <-
+                liftIO (doesFileExist metaYamlFile)
+                    >>= bool (pure nullMeta) (loadYamlMeta config metaYamlFile)
+            let combinedMeta = metaUnion meta' meta
+            forP (HM.elems subforest) (loadPagesRecursive combinedMeta) <&> concat
 
 -- | Build a menu trie from all pages
 buildMenuTrie :: [Page] -> MenuTrie
@@ -273,11 +279,11 @@ buildMenuTrie = roseTrieFromList . fmap toAssoc . filter (not . (.hidden))
 
 -- | Add menu metadata to a page
 addMenuToPage :: MenuTrie -> Page -> Page
-addMenuToPage menu page
-    = let pageMenu = buildMenuForPath page.urlSegments menu
-      in page {
-             doc = modifyMeta (addMeta "menu" pageMenu) page.doc
-         }
+addMenuToPage menu page =
+    let pageMenu = buildMenuForPath page.urlSegments menu
+    in  page
+            { doc = modifyMeta (addMeta "menu" pageMenu) page.doc
+            }
 
 -- | Build a menu for a single page from the full menu trie.
 --
@@ -296,42 +302,43 @@ addMenuToPage menu page
 --
 --     title: menu-title of the menu item
 --     url: URL of the page referred to by this item
---
 buildMenuForPath
-    :: [Url] -- ^ List of page's URL segments
-    -> MenuTrie -- ^ The full menu trie containing all pages
+    :: [Url]
+    -- ^ List of page's URL segments
+    -> MenuTrie
+    -- ^ The full menu trie containing all pages
     -> MetaValue
-buildMenuForPath initialPath initialMenu
-    = MetaList $! buildMenuLevels initialPath initialMenu 0
+buildMenuForPath initialPath initialMenu =
+    MetaList $! buildMenuLevels initialPath initialMenu 0
   where
-    -- | Build menu level definitions for all open branches (following the provided path)
+    -- \| Build menu level definitions for all open branches (following the provided path)
     buildMenuLevels :: [Url] -> MenuTrie -> Int -> [MetaValue]
-    buildMenuLevels path (TrieNode root submenu) level
-        = menuLevel : nextMenuLevels path
+    buildMenuLevels path (TrieNode root submenu) level =
+        menuLevel : nextMenuLevels path
       where
         menuItems :: [MetaValue]
         menuItems = fmap toMenuItem . sortOn ((.order) . snd) . fmap (second getRoot) . HM.toList $ submenu
 
         -- Converta (Url, Page) pair to a proper menu item.
         toMenuItem :: (Url, Page) -> MetaValue
-        toMenuItem (p, page)
-            = let isCurrent = take 1 path == [p]
-              in MetaMap . M.fromList $! pageEntries isCurrent page
+        toMenuItem (p, page) =
+            let isCurrent = take 1 path == [p]
+            in  MetaMap . M.fromList $! pageEntries isCurrent page
 
         menuLevel :: MetaValue
-        menuLevel
-            = MetaMap . M.fromList . concat $
-              [ pageEntries True root,
-                [ ("level", MetaString . T.pack . show $! level) ],
-                [ ("items", MetaList menuItems) ]
-              ]
+        menuLevel =
+            MetaMap . M.fromList . concat $
+                [ pageEntries True root,
+                  [("level", MetaString . T.pack . show $! level)],
+                  [("items", MetaList menuItems)]
+                ]
 
         nextMenuLevels :: [Url] -> [MetaValue]
         nextMenuLevels [] = []
-        nextMenuLevels (p : ps)
-            = case HM.lookup p submenu of
-                  Just subtrie -> buildMenuLevels ps subtrie (level + 1)
-                  Nothing -> [] -- Rest of the path is probably hidden
+        nextMenuLevels (p : ps) =
+            case HM.lookup p submenu of
+                Just subtrie -> buildMenuLevels ps subtrie (level + 1)
+                Nothing -> [] -- Rest of the path is probably hidden
 
     -- Relative URL of the root page of the whole site
     rootRelative :: Url
@@ -339,11 +346,11 @@ buildMenuForPath initialPath initialMenu
 
     -- Construct menu item entries for a page
     pageEntries :: Bool -> Page -> [(Url, MetaValue)]
-    pageEntries isCurrent page
-        = [ ("url", MetaString $! rootRelative <> page.url),
-            ("title", page.menuTitle),
-            ("current", MetaBool isCurrent)
-          ]
+    pageEntries isCurrent page =
+        [ ("url", MetaString $! rootRelative <> page.url),
+          ("title", page.menuTitle),
+          ("current", MetaBool isCurrent)
+        ]
 
 -- | Load a single page from a Markdown file
 loadPage :: HasCallStack => SiteConfig -> Meta -> OsPath -> Action Page
@@ -374,51 +381,55 @@ loadPage config meta fp = cacheAction ("page" :: T.Text, fp) do
         absoluteUrl = config.siteUrl <> url
         rootUrlRelative =
             if null urlSegments
-            then "./"
-            else T.replicate (length urlSegments) "../"
+                then "./"
+                else T.replicate (length urlSegments) "../"
 
-    time <- fetchLastCommitTime fp >>= \case
-        Just t -> pure $! t
-        Nothing -> liftIO $! getModificationTime fp
+    time <-
+        fetchLastCommitTime fp >>= \case
+            Just t -> pure $! t
+            Nothing -> liftIO $! getModificationTime fp
     creationTime <- fetchFirstCommitTime fp <&> fromMaybe time
 
     let doc' = flip modifyMeta doc $
-               \m -> addMeta "site-root" (MetaString rootUrlRelative)
-                     . addMeta "site-url" (MetaString config.siteUrl)
-                     . addMeta "absolute-url" (MetaString absoluteUrl)
-                     . addMeta "url" (MetaString if T.null url then "./" else url)
-                     . addMeta "date-meta" (MetaString . T.pack $! iso8601Show time)
-                     . addMeta "date" (MetaString . T.pack $! formatTime config.timeLocale (T.unpack config.dateFormat) time)
-                     . addMeta "creation-date-meta" (MetaString . T.pack $! iso8601Show creationTime)
-                     . addMeta "creation-date" (MetaString . T.pack $! formatTime config.timeLocale (T.unpack config.dateFormat) creationTime)
-                     $! metaUnion m meta
+            \m ->
+                addMeta "site-root" (MetaString rootUrlRelative)
+                    . addMeta "site-url" (MetaString config.siteUrl)
+                    . addMeta "absolute-url" (MetaString absoluteUrl)
+                    . addMeta "url" (MetaString if T.null url then "./" else url)
+                    . addMeta "date-meta" (MetaString . T.pack $! iso8601Show time)
+                    . addMeta "date" (MetaString . T.pack $! formatTime config.timeLocale (T.unpack config.dateFormat) time)
+                    . addMeta "creation-date-meta" (MetaString . T.pack $! iso8601Show creationTime)
+                    . addMeta "creation-date" (MetaString . T.pack $! formatTime config.timeLocale (T.unpack config.dateFormat) creationTime)
+                    $! metaUnion m meta
         meta' = getDocMeta doc'
 
     verifyMetaKeys config.requiredMetadata config.optionalMetadata meta'
 
-    let menuTitle = fromMaybe (error "Impossible: page has no title")
-                    $ lookupMeta "menu-title" meta'
+    let menuTitle =
+            fromMaybe (error "Impossible: page has no title") $
+                lookupMeta "menu-title" meta'
                     <|> lookupMeta "title" meta'
         order = either error fst . T.decimal . stringify . lookupMetaForce "order" $ meta'
         hidden = case lookupMeta "hidden" meta' of
-                     Just (MetaBool val) -> val
-                     Nothing -> False
-                     val -> error $ "Invalid value for meta key 'hidden': " <> show val
+            Just (MetaBool val) -> val
+            Nothing -> False
+            val -> error $ "Invalid value for meta key 'hidden': " <> show val
 
     templateFile <- (liftIO . encodeFS) . T.unpack . stringify . lookupMetaForce "template" $ meta'
     template <- loadTemplate $! config.templatesDir </> templateFile
 
-    pure $! Page {
-        url = url,
-        urlSegments = urlSegments,
-        absoluteUrl = absoluteUrl,
-        doc = doc',
-        menuTitle = menuTitle,
-        order = order,
-        hidden = hidden,
-        template = template,
-        destFile = destFile
-    }
+    pure $!
+        Page
+            { url = url,
+              urlSegments = urlSegments,
+              absoluteUrl = absoluteUrl,
+              doc = doc',
+              menuTitle = menuTitle,
+              order = order,
+              hidden = hidden,
+              template = template,
+              destFile = destFile
+            }
 
 -- | Load a template from file
 loadTemplate :: HasCallStack => OsPath -> Action (Template T.Text)
@@ -438,37 +449,43 @@ loadYamlMeta config fp = do
 writePage :: SiteConfig -> Page -> Action ()
 writePage config page = cacheActionWith ("writePage" :: T.Text, page.destFile) page do
     liftIO . putStrLn $ "Writing page " <> (show page.destFile)
-    let options = config.htmlWriterOptions { writerTemplate = Just page.template }
+    let options = config.htmlWriterOptions {writerTemplate = Just page.template}
     renderPandoc (writeHtml5String options) page.doc >>= writeTextFile page.destFile
 
 -- | Load a markdown file into a pandoc document
 readMarkdownFile :: SiteConfig -> OsPath -> Action Pandoc
-readMarkdownFile config fp
-    = readTextFile fp >>= readPandoc (readMarkdown config.markdownReaderOptions) fp
+readMarkdownFile config fp =
+    readTextFile fp >>= readPandoc (readMarkdown config.markdownReaderOptions) fp
 
 -- | Copy static files to their destination directories
 copyStaticFiles :: SiteConfig -> Action ()
 copyStaticFiles config = do
     let staticSegmentsCount = length . splitDirectories $ config.staticDir
-    files <- liftIO $! listDirectoryRecursive config.staticDir
-             >>= filterM (liftIO . doesFileExist)
+    files <-
+        liftIO $!
+            listDirectoryRecursive config.staticDir
+                >>= filterM (liftIO . doesFileExist)
     void $! forP files \sourceFile ->
         let pathSegments = drop staticSegmentsCount $! splitDirectories sourceFile
             destFile = joinPath $! config.outputDir : pathSegments
-        in copyFileIfChanged sourceFile destFile
+        in  copyFileIfChanged sourceFile destFile
     pure ()
 
 -- | Copy a single file creating missing directories as necessary. The copy is
 -- not performed, if destination file exists, and its size and modification
 -- time match the source file.
-copyFileIfChanged :: OsPath -- ^ Source file path
-         -> OsPath -- ^ Destination file path
-         -> Action ()
+copyFileIfChanged
+    :: OsPath
+    -- ^ Source file path
+    -> OsPath
+    -- ^ Destination file path
+    -> Action ()
 copyFileIfChanged source dest = liftIO $ do
     -- Check if the file needs to be copied
-    doCopy <- ifM (not <$> doesFileExist dest) (pure True)
-              $ ifM (liftA2 (/=) (getFileSize source) (getFileSize dest)) (pure True)
-              $ ifM (liftA2 (/=) (getModificationTime source) (getModificationTime dest)) (pure True) (pure False)
+    doCopy <-
+        ifM (not <$> doesFileExist dest) (pure True) $
+            ifM (liftA2 (/=) (getFileSize source) (getFileSize dest)) (pure True) $
+                ifM (liftA2 (/=) (getModificationTime source) (getModificationTime dest)) (pure True) (pure False)
 
     when doCopy $ do
         putStrLn $ "Copying file " <> show source
@@ -485,16 +502,18 @@ makeSitemap config pages = do
     writeTextFile (config.outputDir </> config.sitemapFile) text
   where
     toSitemapMeta :: Page -> M.Map T.Text T.Text
-    toSitemapMeta page
-        = let meta = getDocMeta $! page.doc
-          in M.fromList
-             [ ("absolute-url", escapeStringForXML page.absoluteUrl),
-               ("title", escapeStringForXML $! stringify page.menuTitle),
-               ("date", escapeStringForXML $! lookupMetaString "date-meta" meta)
-             ]
+    toSitemapMeta page =
+        let meta = getDocMeta $! page.doc
+        in  M.fromList
+                [ ("absolute-url", escapeStringForXML page.absoluteUrl),
+                  ("title", escapeStringForXML $! stringify page.menuTitle),
+                  ("date", escapeStringForXML $! lookupMetaString "date-meta" meta)
+                ]
 
 -- | Make a RoseTrie from a directory tree
 makeDirectoryTrie :: OsPath -> Action (RoseTrie OsPath OsPath)
-makeDirectoryTrie rootDir
-    = let prefixLength = length $! splitDirectories rootDir
-      in (liftIO (listDirectoryRecursive rootDir) <&> (roseTrieFromList . fmap (\p -> (drop prefixLength $! splitDirectories p, p))))
+makeDirectoryTrie rootDir =
+    let prefixLength = length $! splitDirectories rootDir
+    in  ( liftIO (listDirectoryRecursive rootDir)
+            <&> (roseTrieFromList . fmap (\p -> (drop prefixLength $! splitDirectories p, p)))
+        )
