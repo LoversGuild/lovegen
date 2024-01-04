@@ -298,7 +298,7 @@ fetchGitCommitTime gitOpts fp = do
         readProcessStdout $!
             setEnv [("TZ", "UTC")] $!
                 proc "git" (["log", "-1", "--format=%aI"] <> gitOpts <> ["--", stringFP])
-    if code == ExitSuccess
+    if code /= ExitSuccess
         then pure Nothing
         else pure $! iso8601ParseM . T.unpack . decodeUtf8 . BL.toStrict $! out
 
