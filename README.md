@@ -50,15 +50,10 @@ To run the site generator, execute either of the following commands.
 
 If you installed LoveGen somerwhere where your shell can find it, run:
 ```sh
-$ lovegen -C <website directory>
+$ lovegen <website directory>
 ```
-or just
-```sh
-$ lovegen
-```
-if `<website directory>` is your working directory.
 
-If you did not install LoveGen, run `cabal run lovegen -- -C <website directory>` in the root directory of LoveGen's sources.
+If you did not install LoveGen, run `cabal run lovegen -- <website directory>` in the root directory of LoveGen's sources.
 
 `<website directory>` is the directory where your website contents are stored.
 
@@ -71,11 +66,12 @@ When run, LoveGen reads site contents from various directories under the website
 By default these are: `pages/` for page contents, `static/` for static files and `tempaltes/` for page templates.
 
 It then generates the ready-to-deploy site to the `output/` directory.
-The build system also stores cache data to the `shake/` directory.
 
-The generator uses `Development.Shake.Forward` module for tracking build dependencies.
-This does not work very well yet (probably due to some misconfiguration on our side).
-As a result, you may occasionally need to `rm -rf output shake` after editing the site contents.
+`LoveGen` does not track dependencies.
+As a result it rewrites all output files on every run.
+On small and medium sized websites this is not an issue.
+`LoveGen` does not delete stale files from the output directory.
+If you remove or rename pages or static files, you need to delete the target directory before running `LoveGen`.
 
 # Hacking
 

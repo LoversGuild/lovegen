@@ -4,9 +4,8 @@
 module Main (main) where
 
 import Control.Applicative ((<|>))
-import Control.Monad (ap, filterM, void, when)
+import Control.Monad (ap, filterM, forM, forM_, when)
 import Data.Bifunctor (second)
-import Data.Binary
 import Data.Bool (bool)
 import Data.Functor ((<&>))
 import Data.HashMap.Strict qualified as HM
@@ -18,8 +17,6 @@ import Data.Text qualified as T
 import Data.Text.Read qualified as T
 import Data.Time
 import Data.Time.Format.ISO8601
-import Development.Shake hiding (doesFileExist)
-import Development.Shake.Forward
 import GHC.Generics (Generic)
 import GHC.Stack (HasCallStack)
 import System.Directory.OsPath
@@ -31,7 +28,6 @@ import Text.Pandoc.Shared (headerShift, stringify)
 import Text.Pandoc.Writers.Shared (lookupMetaString)
 import Text.Pandoc.XML (escapeStringForXML)
 
-import LoveGen.Orphans ()
 import LoveGen.Utils
 
 -------------------
@@ -215,29 +211,18 @@ data Page = Page
       destFile :: OsPath
     }
     deriving stock (Eq, Generic, Show)
-    deriving anyclass (Binary)
 
 -- | A trie containing data needed for menu creation
 type MenuTrie = RoseTrie Url Page
 
 -- | Main function of the generator
 main :: IO ()
-main = shakeArgsForward shakeOpts do
+main = do
     buildSite finnishSite
     buildSite englishSite
-  where
-    shakeOpts :: ShakeOptions
-    shakeOpts =
-        shakeOptions
-            { shakeFiles = "shake",
-              shakeLint = Just LintBasic,
-              shakeLintInside = ["."],
-              shakeThreads = 0,
-              shakeVerbosity = Chatty
-            }
 
 -- | Build a website
-buildSite :: SiteConfig -> Action ()
+buildSite :: SiteConfig -> IO ()
 buildSite config = do
     pages <- loadPages config
     let menu = buildMenuTrie pages
@@ -246,17 +231,17 @@ buildSite config = do
     makeSitemap config pages
 
 -- | Load all pages
-loadPages :: HasCallStack => SiteConfig -> Action [Page]
+loadPages :: HasCallStack => SiteConfig -> IO [Page]
 loadPages config = do
     -- Build a tree from the directory hierarchy.
     pathTrie <- makeDirectoryTrie config.pagesDir
     loadPagesRecursive nullMeta pathTrie
   where
-    loadPagesRecursive :: Meta -> RoseTrie OsPath OsPath -> Action [Page]
+    loadPagesRecursive :: Meta -> RoseTrie OsPath OsPath -> IO [Page]
     loadPagesRecursive meta (TrieNode path subforest)
         | HM.null subforest = do
             -- This might be a file
-            isFile <- liftIO $! doesFileExist path
+            isFile <- doesFileExist path
             if isFile && isExtensionOf [osp|md|] path
                 then fmap (: []) $! loadPage config meta path
                 else pure []
@@ -264,10 +249,10 @@ loadPages config = do
             -- This is a directory
             let metaYamlFile = path </> config.metaYamlFile
             meta' <-
-                liftIO (doesFileExist metaYamlFile)
+                doesFileExist metaYamlFile
                     >>= bool (pure nullMeta) (loadYamlMeta config metaYamlFile)
             let combinedMeta = metaUnion meta' meta
-            forP (HM.elems subforest) (loadPagesRecursive combinedMeta) <&> concat
+            forM (HM.elems subforest) (loadPagesRecursive combinedMeta) <&> concat
 
 -- | Build a menu trie from all pages
 buildMenuTrie :: [Page] -> MenuTrie
@@ -353,9 +338,9 @@ buildMenuForPath initialPath initialMenu =
         ]
 
 -- | Load a single page from a Markdown file
-loadPage :: HasCallStack => SiteConfig -> Meta -> OsPath -> Action Page
-loadPage config meta fp = cacheAction ("page" :: T.Text, fp) do
-    liftIO . putStrLn $ "Loading page " <> show fp
+loadPage :: HasCallStack => SiteConfig -> Meta -> OsPath -> IO Page
+loadPage config meta fp = do
+    putStrLn $ "Loading page " <> show fp
     doc <- readMarkdownFile config fp <&> (headerShift config.shiftHeaders)
 
     -- Metadata handling
@@ -387,7 +372,7 @@ loadPage config meta fp = cacheAction ("page" :: T.Text, fp) do
     time <-
         fetchLastCommitTime fp >>= \case
             Just t -> pure $! t
-            Nothing -> liftIO $! getModificationTime fp
+            Nothing -> getModificationTime fp
     creationTime <- fetchFirstCommitTime fp <&> fromMaybe time
 
     let doc' = flip modifyMeta doc $
@@ -415,7 +400,7 @@ loadPage config meta fp = cacheAction ("page" :: T.Text, fp) do
             Nothing -> False
             val -> error $ "Invalid value for meta key 'hidden': " <> show val
 
-    templateFile <- (liftIO . encodeFS) . T.unpack . stringify . lookupMetaForce "template" $ meta'
+    templateFile <- encodeFS . T.unpack . stringify . lookupMetaForce "template" $ meta'
     template <- loadTemplate $! config.templatesDir </> templateFile
 
     pure $!
@@ -432,44 +417,42 @@ loadPage config meta fp = cacheAction ("page" :: T.Text, fp) do
             }
 
 -- | Load a template from file
-loadTemplate :: HasCallStack => OsPath -> Action (Template T.Text)
-loadTemplate fp = cacheAction ("template" :: T.Text, fp) do
-    stringFP <- liftIO $! decodeFS fp
+loadTemplate :: HasCallStack => OsPath -> IO (Template T.Text)
+loadTemplate fp = do
+    stringFP <- decodeFS fp
     text <- readTextFile fp
     compileTemplate stringFP text
         >>= either fail pure
 
 -- | Load metadata from YAML file
-loadYamlMeta :: SiteConfig -> OsPath -> Action Meta
+loadYamlMeta :: SiteConfig -> OsPath -> IO Meta
 loadYamlMeta config fp = do
-    stringFP <- liftIO $! decodeFS fp
-    readBinaryFile fp >>= runPandocAction . (yamlToMeta config.markdownReaderOptions (Just stringFP))
+    stringFP <- decodeFS fp
+    readBinaryFile fp >>= runPandoc . (yamlToMeta config.markdownReaderOptions (Just stringFP))
 
 -- | Render a Page to its destination file
-writePage :: SiteConfig -> Page -> Action ()
-writePage config page = cacheActionWith ("writePage" :: T.Text, page.destFile) page do
-    liftIO . putStrLn $ "Writing page " <> (show page.destFile)
+writePage :: SiteConfig -> Page -> IO ()
+writePage config page = do
+    putStrLn $ "Writing page " <> (show page.destFile)
     let options = config.htmlWriterOptions {writerTemplate = Just page.template}
     renderPandoc (writeHtml5String options) page.doc >>= writeTextFile page.destFile
 
 -- | Load a markdown file into a pandoc document
-readMarkdownFile :: SiteConfig -> OsPath -> Action Pandoc
+readMarkdownFile :: SiteConfig -> OsPath -> IO Pandoc
 readMarkdownFile config fp =
     readTextFile fp >>= readPandoc (readMarkdown config.markdownReaderOptions) fp
 
 -- | Copy static files to their destination directories
-copyStaticFiles :: SiteConfig -> Action ()
+copyStaticFiles :: SiteConfig -> IO ()
 copyStaticFiles config = do
     let staticSegmentsCount = length . splitDirectories $ config.staticDir
     files <-
-        liftIO $!
-            listDirectoryRecursive config.staticDir
-                >>= filterM (liftIO . doesFileExist)
-    void $! forP files \sourceFile ->
+        listDirectoryRecursive config.staticDir
+            >>= filterM doesFileExist
+    forM_ files \sourceFile ->
         let pathSegments = drop staticSegmentsCount $! splitDirectories sourceFile
             destFile = joinPath $! config.outputDir : pathSegments
         in  copyFileIfChanged sourceFile destFile
-    pure ()
 
 -- | Copy a single file creating missing directories as necessary. The copy is
 -- not performed, if destination file exists, and its size and modification
@@ -479,8 +462,8 @@ copyFileIfChanged
     -- ^ Source file path
     -> OsPath
     -- ^ Destination file path
-    -> Action ()
-copyFileIfChanged source dest = liftIO $ do
+    -> IO ()
+copyFileIfChanged source dest = do
     -- Check if the file needs to be copied
     doCopy <-
         ifM (not <$> doesFileExist dest) (pure True) $
@@ -493,7 +476,7 @@ copyFileIfChanged source dest = liftIO $ do
         copyFileWithMetadata source dest
 
 -- | Create a sitemap from a template
-makeSitemap :: SiteConfig -> [Page] -> Action ()
+makeSitemap :: SiteConfig -> [Page] -> IO ()
 makeSitemap config pages = do
     template <- loadTemplate $! config.templatesDir </> config.sitemapTemplateFile
     let metaList = fmap toSitemapMeta . sortOn (.url) . filter (not . (.hidden)) $! pages
@@ -511,9 +494,9 @@ makeSitemap config pages = do
                 ]
 
 -- | Make a RoseTrie from a directory tree
-makeDirectoryTrie :: OsPath -> Action (RoseTrie OsPath OsPath)
+makeDirectoryTrie :: OsPath -> IO (RoseTrie OsPath OsPath)
 makeDirectoryTrie rootDir =
     let prefixLength = length $! splitDirectories rootDir
-    in  ( liftIO (listDirectoryRecursive rootDir)
+    in  ( listDirectoryRecursive rootDir
             <&> (roseTrieFromList . fmap (\p -> (drop prefixLength $! splitDirectories p, p)))
         )
