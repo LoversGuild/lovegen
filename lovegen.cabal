@@ -31,7 +31,7 @@ flag Weverything
     default: False
     manual: True
 
-executable lovegen
+library
     build-depends:
         base ^>={ 4.17, 4.18, 4.19 },
         bytestring ^>= { 0.11.3, 0.12 },
@@ -90,7 +90,7 @@ executable lovegen
     else
         ghc-options: -Wall -Wcompat
     hs-source-dirs: src
-    main-is: Main.hs
+    exposed-modules:
+        LoveGen
     other-modules:
         LoveGen.CommandLine
-        LoveGen.Utils
