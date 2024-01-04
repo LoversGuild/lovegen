@@ -1,39 +1,37 @@
-{-# OPTIONS_GHC -Wno-redundant-constraints #-}
-
--- | Utility functions for the website genrator
+-- |
+-- Module      : LoveGen.RoseTrie
+-- Description : A prefix trie with associated values and arbitrary number of child nodes
+-- Copyright   : Copyright (C) 2023-2024 The Lovers' Guild
+-- License     : AGPL-3
+-- Maintainer  : dev@loversguild.org
+-- Stability   : experimental
+-- Portability : GHC
 --
--- These are generic routines and not directly related to any particular website.
-module LoveGen.Utils (
-    -- URLs
-    Url,
-    osPathToUrl,
-    urlToOsPath,
-    -- Monadic conditional
-    ifM,
-
-    -- * File management
-    readTextFile,
-    writeTextFile,
-    readBinaryFile,
-    writeBinaryFile,
-    listDirectoryRecursive,
-
-    -- * Pandoc format conversion
-    PandocReader,
-    PandocWriter,
-    readPandoc,
-    renderPandoc,
-    runPandoc,
-
-    -- * Metadata management
-    verifyMetaKeys,
-    getDocMeta,
-    modifyMeta,
-    metaUnion,
-    addMeta,
-    lookupMetaForce,
-
-    -- * RoseTrie
+-- This module defines Rose tries.
+--
+-- A 'RoseTrie' represents a hybrid tree structure that combines elements of
+-- a rose tree and a trie (prefix tree). Each 'RoseTrie' node stores a value of
+-- type 'a' and has an associated 'RoseForest', which is a hash map from keys
+-- of type 'k' to subsequent 'RoseTrie' nodes. This allows for a flexible number
+-- of children per node (as in a rose tree), while also enabling efficient
+-- prefix-based retrieval of values (as in a trie).
+--
+-- The 'RoseTrie' can be visualized as a tree where every path from the root
+-- to a specific node represents a sequence of keys, and the node itself
+-- encapsulates a value. The organization of nodes into a hash map allows for
+-- efficient navigation based on given keys, supporting operations that are
+-- typical for trie structures, such as efficient lookup, insertion, and deletion
+-- of key sequences.
+--
+-- The 'RoseTrie' is a versatile data structure suitable for various applications
+-- that require organizing and retrieving data hierarchically and via key sequences,
+-- such as indexing systems, associative arrays, and complex nested configurations.
+--
+-- @
+-- data RoseTrie k a = TrieNode { value :: a, subForest :: RoseForest k a }
+-- type RoseForest k a = HM.HashMap k (RoseTrie k a)
+-- @
+module LoveGen.RoseTrie (
     RoseTrie (..),
     RoseForest,
     singletonRoseTrie,
@@ -41,196 +39,13 @@ module LoveGen.Utils (
     getRoot,
     getForest,
     insertWithPath,
-
-    -- * Time information management
-    fetchFirstCommitTime,
-    fetchLastCommitTime,
 )
 where
 
-import Control.Monad (foldM, when, (>=>))
-import Data.Bool (bool)
-import Data.ByteString qualified as BS
-import Data.ByteString.Lazy qualified as BL
 import Data.HashMap.Strict qualified as HM
-import Data.HashSet qualified as HS
 import Data.Hashable
 import Data.List (foldl', sortOn)
-import Data.Map.Strict qualified as M
-import Data.Text qualified as T
-import Data.Text.Encoding
-import Data.Time
-import Data.Time.Format.ISO8601
 import GHC.Stack
-import System.Directory.OsPath
-import System.File.OsPath qualified as OP
-import System.OsPath
-import System.Process.Typed
-import Text.Pandoc
-
--- | Type for storing URLs
-type Url = T.Text
-
--- | Convert an OsPath to Url
-osPathToUrl :: OsPath -> IO Url
-osPathToUrl = decodeFS >=> pure . T.pack
-
--- | Convert an Url to OsPath
-urlToOsPath :: Url -> IO OsPath
-urlToOsPath url
-    | T.null url = pure $! [osp|.|]
-    | otherwise = encodeFS . T.unpack $! url
-
--- | Like if, but condition can be monadic
-ifM
-    :: Monad m
-    => m Bool
-    -- ^ Conditional
-    -> m a
-    -- ^ Then action
-    -> m a
-    -- ^ Else action
-    -> m a
-ifM cond true false = cond >>= bool false true
-
--- | Read a text file (in UTF-8).
---
--- Throws an exception on invalid UTF-8 input
-readTextFile :: HasCallStack => OsPath -> IO T.Text
-readTextFile = fmap decodeUtf8 . readBinaryFile
-
--- | Write a text file with UTF-8 encoding
-writeTextFile :: HasCallStack => OsPath -> T.Text -> IO ()
-writeTextFile fp text = writeBinaryFile fp $! encodeUtf8 text
-
--- | Read a file of bytes
-readBinaryFile :: HasCallStack => OsPath -> IO BS.ByteString
-readBinaryFile fp = OP.readFile' fp
-
--- | Write a file of bytes
-writeBinaryFile :: HasCallStack => OsPath -> BS.ByteString -> IO ()
-writeBinaryFile fp bytes = do
-    createDirectoryIfMissing True $! takeDirectory fp
-    doesFileExist fp >>= flip when (removeFile fp)
-    OP.writeFile' fp bytes
-
--- | Recursively list all paths under a subdirectory.
-listDirectoryRecursive :: OsPath -> IO [OsPath]
-listDirectoryRecursive dir = fmap reverse $! scanDir [dir] dir
-  where
-    -- Scan a subdirectory and return all paths found so far
-    scanDir :: [OsPath] -> OsPath -> IO [OsPath]
-    scanDir found fp =
-        listDirectory fp
-            >>= foldM scanEntry found . fmap (fp </>)
-
-    -- Scan a single directory entry and return a list of all paths found so far
-    scanEntry :: [OsPath] -> OsPath -> IO [OsPath]
-    scanEntry found path =
-        let found' = path : found
-        in  doesDirectoryExist path
-                >>= bool (pure $! found') (scanDir found' path)
-
--- | A reader function. Make one by applying a Pandoc reader to ReaderOptions.
-type PandocReader = [(FilePath, T.Text)] -> PandocIO Pandoc
-
--- | A writer function. Make one by applying a Pandoc writer to WriterOptions.
-type PandocWriter = Pandoc -> PandocIO T.Text
-
--- | Read a document with a specified reader function
-readPandoc
-    :: PandocReader
-    -- ^ Reader to use for converting the text to AST
-    -> OsPath
-    -- ^ Name of the file (for error messages)
-    -> T.Text
-    -- ^ Text to convert
-    -> IO Pandoc
-readPandoc reader fp content = do
-    stringFP <- decodeFS fp
-    runPandoc $! reader [(stringFP, content)]
-
--- | Render a Pandoc document with a writer function
-renderPandoc
-    :: PandocWriter
-    -> Pandoc
-    -> IO T.Text
-renderPandoc writer doc =
-    runPandoc $! writer doc
-
--- | Run Pandoc inside IO
-runPandoc :: PandocIO a -> IO a
-runPandoc =
-    runIO >=> either (fail . show) pure
-
--- metaToJson :: PandocWriter -> Meta -> IO A.Value
--- metaToJson writer (Meta meta)
---     = runPandoc $! A.toJSON <$> traverse go meta
---   where
---     go :: MetaValue -> PandocIO A.Value
---     go (MetaMap m) = A.toJSON <$> traverse go m
---     go (MetaList m) = A.toJSONList <$> traverse go m
---     go (MetaBool m) = pure $! A.toJSON m
---     go (MetaString m) = pure $! A.toJSON m
---     go (MetaInlines m) = A.toJSON <$> (writer . Pandoc mempty . (: []) . Plain $! m)
---     go (MetaBlocks m) = A.toJSON <$> (writer . Pandoc mempty $! m)
-
--- | Verify that a JSON metadata object has all desired keys, and all of them
-verifyMetaKeys
-    :: HasCallStack
-    => HS.HashSet T.Text
-    -- ^ A set of mndatory keys
-    -> HS.HashSet T.Text
-    -- ^ A set of optional keys
-    -> Meta
-    -- ^ The metadata object
-    -> IO ()
-verifyMetaKeys required optional (Meta mmap) =
-    let present = HS.fromList $! M.keys mmap
-        desired = HS.union optional required
-        missing = HS.difference required present
-        surplus = HS.difference present desired
-    in  ( when (not $! HS.null missing && HS.null surplus) $
-            error $!
-                "Metadata verification failed -"
-                    <> " missing keys: "
-                    <> show missing
-                    <> ", excess keys: "
-                    <> show surplus
-        )
-
--- | Extract metadata from a Pandoc document
-getDocMeta :: Pandoc -> Meta
-getDocMeta (Pandoc meta _) = meta
-
--- | Modify the metadata embedded in a Pandoc
-modifyMeta :: (Meta -> Meta) -> Pandoc -> Pandoc
-modifyMeta f (Pandoc meta blocks) =
-    Pandoc (f meta) blocks
-
--- | Combine Meta values. Maps are joined together such that keys in the first
--- map take precedence. Lists are concatenated. Every other value is
--- overwritten with the one in the first Meta. If values are not of compatible
--- type, the first value takes precedence.
-metaUnion :: Meta -> Meta -> Meta
-metaUnion (Meta ma) (Meta mb) = Meta $! M.unionWith combineMeta ma mb
-  where
-    combineMeta :: MetaValue -> MetaValue -> MetaValue
-    combineMeta (MetaMap a) (MetaMap b) = MetaMap $! M.unionWith combineMeta a b
-    combineMeta (MetaList a) (MetaList b) = MetaList $! a <> b
-    combineMeta a _ = a
-
--- | Add a key/value pair to metadata
-addMeta :: T.Text -> MetaValue -> Meta -> Meta
-addMeta key val (Meta mmap) = Meta $! M.insert key val mmap
-
--- | Forcefully lookup a meta value
-lookupMetaForce :: HasCallStack => T.Text -> Meta -> MetaValue
-lookupMetaForce key meta =
-    case lookupMeta key meta of
-        Just val -> val
-        Nothing ->
-            error $ "Required metadata key " <> show key <> " was not found from metadata: " <> show meta
 
 -- | Rose trie and map data structure using hashmaps
 data RoseTrie k a = TrieNode a (RoseForest k a)
@@ -289,23 +104,3 @@ insertWithPath (p : ps) node forest =
                     <> " -- map is "
                     <> show forest
 insertWithPath [] _ _ = error $! "Attempted to add an empty key into a RoseTrie"
-
--- | Fetch a commit datetime of a file from git repository
-fetchGitCommitTime :: [String] -> OsPath -> IO (Maybe UTCTime)
-fetchGitCommitTime gitOpts fp = do
-    stringFP <- decodeFS fp
-    (code, out) <-
-        readProcessStdout $!
-            setEnv [("TZ", "UTC")] $!
-                proc "git" (["log", "-1", "--format=%aI"] <> gitOpts <> ["--", stringFP])
-    if code /= ExitSuccess
-        then pure Nothing
-        else pure $! iso8601ParseM . T.unpack . decodeUtf8 . BL.toStrict $! out
-
--- | Fetch the date and time of the first commit of a file
-fetchFirstCommitTime :: OsPath -> IO (Maybe UTCTime)
-fetchFirstCommitTime = fetchGitCommitTime ["--diff-filter=A", "--follow", "--find-renames=40%"]
-
--- | Fetch the date and time of the latest commit of a file
-fetchLastCommitTime :: OsPath -> IO (Maybe UTCTime)
-fetchLastCommitTime = fetchGitCommitTime []
