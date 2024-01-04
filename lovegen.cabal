@@ -48,6 +48,7 @@ executable lovegen
         unordered-containers ^>=0.2.19.1
 
     default-extensions:
+        ApplicativeDo,
         BlockArguments,
         DataKinds,
         DeriveAnyClass,
@@ -59,6 +60,7 @@ executable lovegen
         OverloadedRecordDot,
         OverloadedStrings,
         QuasiQuotes,
+        RecordWildCards,
         StrictData,
         TypeFamilies
 
