@@ -28,6 +28,7 @@ import Text.Pandoc.Shared (headerShift, stringify)
 import Text.Pandoc.Writers.Shared (lookupMetaString)
 import Text.Pandoc.XML (escapeStringForXML)
 
+import LoveGen.CommandLine
 import LoveGen.Utils
 
 -------------------
@@ -218,6 +219,9 @@ type MenuTrie = RoseTrie Url Page
 -- | Main function of the generator
 main :: IO ()
 main = do
+    cliOpts <- parseCmdLine
+    rootDir <- encodeFS cliOpts.directory
+    setCurrentDirectory rootDir
     buildSite finnishSite
     buildSite englishSite
 
