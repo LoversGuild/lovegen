@@ -1,23 +1,16 @@
 {-# OPTIONS_GHC -Wno-redundant-constraints #-}
 
--- | Utility functions for the website genrator
+-- |
+-- Module      : LoveGen.Pandoc
+-- Description : Utility functions for working with Pandoc
+-- Copyright   : Copyright (C) 2023-2024 The Lovers' Guild
+-- License     : AGPL-3
+-- Maintainer  : dev@loversguild.org
+-- Stability   : experimental
+-- Portability : GHC
 --
--- These are generic routines and not directly related to any particular website.
-module LoveGen.Utils (
-    -- URLs
-    Url,
-    osPathToUrl,
-    urlToOsPath,
-    -- Monadic conditional
-    ifM,
-
-    -- * File management
-    readTextFile,
-    writeTextFile,
-    readBinaryFile,
-    writeBinaryFile,
-    listDirectoryRecursive,
-
+-- This module provides high-level helpers for working with Pandoc.
+module LoveGen.Pandoc (
     -- * Pandoc format conversion
     PandocReader,
     PandocWriter,
@@ -32,109 +25,21 @@ module LoveGen.Utils (
     metaUnion,
     addMeta,
     lookupMetaForce,
-
-    -- * RoseTrie
-    RoseTrie (..),
-    RoseForest,
-    singletonRoseTrie,
-    roseTrieFromList,
-    getRoot,
-    getForest,
-    insertWithPath,
-
-    -- * Time information management
-    fetchFirstCommitTime,
-    fetchLastCommitTime,
 )
 where
 
-import Control.Monad (foldM, when, (>=>))
-import Data.Bool (bool)
-import Data.ByteString qualified as BS
-import Data.ByteString.Lazy qualified as BL
-import Data.HashMap.Strict qualified as HM
+import Control.Monad (when, (>=>))
 import Data.HashSet qualified as HS
-import Data.Hashable
-import Data.List (foldl', sortOn)
 import Data.Map.Strict qualified as M
 import Data.Text qualified as T
-import Data.Text.Encoding
-import Data.Time
-import Data.Time.Format.ISO8601
-import GHC.Stack
-import System.Directory.OsPath
-import System.File.OsPath qualified as OP
+import GHC.Stack (HasCallStack)
 import System.OsPath
-import System.Process.Typed
 import Text.Pandoc
 
--- | Type for storing URLs
-type Url = T.Text
-
--- | Convert an OsPath to Url
-osPathToUrl :: OsPath -> IO Url
-osPathToUrl = decodeFS >=> pure . T.pack
-
--- | Convert an Url to OsPath
-urlToOsPath :: Url -> IO OsPath
-urlToOsPath url
-    | T.null url = pure $! [osp|.|]
-    | otherwise = encodeFS . T.unpack $! url
-
--- | Like if, but condition can be monadic
-ifM
-    :: Monad m
-    => m Bool
-    -- ^ Conditional
-    -> m a
-    -- ^ Then action
-    -> m a
-    -- ^ Else action
-    -> m a
-ifM cond true false = cond >>= bool false true
-
--- | Read a text file (in UTF-8).
---
--- Throws an exception on invalid UTF-8 input
-readTextFile :: HasCallStack => OsPath -> IO T.Text
-readTextFile = fmap decodeUtf8 . readBinaryFile
-
--- | Write a text file with UTF-8 encoding
-writeTextFile :: HasCallStack => OsPath -> T.Text -> IO ()
-writeTextFile fp text = writeBinaryFile fp $! encodeUtf8 text
-
--- | Read a file of bytes
-readBinaryFile :: HasCallStack => OsPath -> IO BS.ByteString
-readBinaryFile fp = OP.readFile' fp
-
--- | Write a file of bytes
-writeBinaryFile :: HasCallStack => OsPath -> BS.ByteString -> IO ()
-writeBinaryFile fp bytes = do
-    createDirectoryIfMissing True $! takeDirectory fp
-    doesFileExist fp >>= flip when (removeFile fp)
-    OP.writeFile' fp bytes
-
--- | Recursively list all paths under a subdirectory.
-listDirectoryRecursive :: OsPath -> IO [OsPath]
-listDirectoryRecursive dir = fmap reverse $! scanDir [dir] dir
-  where
-    -- Scan a subdirectory and return all paths found so far
-    scanDir :: [OsPath] -> OsPath -> IO [OsPath]
-    scanDir found fp =
-        listDirectory fp
-            >>= foldM scanEntry found . fmap (fp </>)
-
-    -- Scan a single directory entry and return a list of all paths found so far
-    scanEntry :: [OsPath] -> OsPath -> IO [OsPath]
-    scanEntry found path =
-        let found' = path : found
-        in  doesDirectoryExist path
-                >>= bool (pure $! found') (scanDir found' path)
-
--- | A reader function. Make one by applying a Pandoc reader to ReaderOptions.
+-- | A type for a Pandoc reader function. Make one by applying a Pandoc reader to ReaderOptions.
 type PandocReader = [(FilePath, T.Text)] -> PandocIO Pandoc
 
--- | A writer function. Make one by applying a Pandoc writer to WriterOptions.
+-- | A type for a Pandoc writer function. Make one by applying a Pandoc writer to WriterOptions.
 type PandocWriter = Pandoc -> PandocIO T.Text
 
 -- | Read a document with a specified reader function
@@ -231,81 +136,3 @@ lookupMetaForce key meta =
         Just val -> val
         Nothing ->
             error $ "Required metadata key " <> show key <> " was not found from metadata: " <> show meta
-
--- | Rose trie and map data structure using hashmaps
-data RoseTrie k a = TrieNode a (RoseForest k a)
-    deriving stock (Eq, Show)
-
--- | A forest trie built using a HashMap
-type RoseForest k a = HM.HashMap k (RoseTrie k a)
-
--- | Make a singleton trie
-singletonRoseTrie :: a -> RoseTrie k a
-singletonRoseTrie node = TrieNode node HM.empty
-
--- | Convert a list of paths to nods into a RoseTrie
-roseTrieFromList
-    :: forall a k
-     . (HasCallStack, Hashable k, Show k, Show a)
-    => [([k], a)]
-    -> RoseTrie k a
-roseTrieFromList = roseTrieFromSortedList . sortOn (length . fst)
-  where
-    -- Extract root element from the sorted (path, item) list, construct the
-    -- top node from it and pass the rest to the rose forest builder
-    roseTrieFromSortedList :: HasCallStack => [([k], a)] -> RoseTrie k a
-    roseTrieFromSortedList [] = error "Cannot create rose trie from empty item list."
-    roseTrieFromSortedList (([], item) : rest) =
-        TrieNode item $! rosesFromList rest
-    roseTrieFromSortedList list = error $ "No trie root element found among " <> (show $! fmap fst list)
-
-    rosesFromList :: HasCallStack => [([k], a)] -> RoseForest k a
-    rosesFromList = foldl' (flip $ uncurry insertWithPath) HM.empty
-
--- | Extract the root item from a rose trie
-getRoot :: RoseTrie k a -> a
-getRoot (TrieNode root _) = root
-
--- | Extract the forest from a rose trie
-getForest :: RoseTrie k a -> RoseForest k a
-getForest (TrieNode _ forest) = forest
-
--- | Insert a node to a forest with path
-insertWithPath
-    :: (HasCallStack, Hashable k, Show k, Show a)
-    => [k]
-    -> a
-    -> RoseForest k a
-    -> RoseForest k a
-insertWithPath [p] node forest = HM.insert p (singletonRoseTrie node) forest
-insertWithPath (p : ps) node forest =
-    case HM.lookup p forest of
-        Just (TrieNode subnode subforest) ->
-            HM.insert p (TrieNode subnode $! insertWithPath ps node subforest) forest
-        Nothing ->
-            error $!
-                "Attempting to insert a node into a RoseTrie with too long path "
-                    <> (show $! p : ps)
-                    <> " -- map is "
-                    <> show forest
-insertWithPath [] _ _ = error $! "Attempted to add an empty key into a RoseTrie"
-
--- | Fetch a commit datetime of a file from git repository
-fetchGitCommitTime :: [String] -> OsPath -> IO (Maybe UTCTime)
-fetchGitCommitTime gitOpts fp = do
-    stringFP <- decodeFS fp
-    (code, out) <-
-        readProcessStdout $!
-            setEnv [("TZ", "UTC")] $!
-                proc "git" (["log", "-1", "--format=%aI"] <> gitOpts <> ["--", stringFP])
-    if code /= ExitSuccess
-        then pure Nothing
-        else pure $! iso8601ParseM . T.unpack . decodeUtf8 . BL.toStrict $! out
-
--- | Fetch the date and time of the first commit of a file
-fetchFirstCommitTime :: OsPath -> IO (Maybe UTCTime)
-fetchFirstCommitTime = fetchGitCommitTime ["--diff-filter=A", "--follow", "--find-renames=40%"]
-
--- | Fetch the date and time of the latest commit of a file
-fetchLastCommitTime :: OsPath -> IO (Maybe UTCTime)
-fetchLastCommitTime = fetchGitCommitTime []
