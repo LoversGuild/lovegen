@@ -1,9 +1,16 @@
 -- |
 -- Module      : LoveGen
 -- Description : A static website generator support library
--- Copyright   : Copyright (C) 2023-2024 Aura Kelloniemi
--- License     : GPL-3
--- Maintainer  : kaura.dev@sange.fi
+-- Copyright   : Copyright (C) 2023-2024 The Lovers' Guild
+-- License     : AGPL-3
+-- Maintainer  : dev@loversguild.org
 -- Stability   : experimental
 -- Portability : GHC
-module LoveGen () where
+--
+-- “Make love, not war!”
+--
+-- LoveGen is a support library for writing static website generators.
+-- This module exports all definitions in this package.
+module LoveGen (
+
+) where
