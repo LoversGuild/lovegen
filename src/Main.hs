@@ -79,7 +79,7 @@ buildSite config = do
 loadPages :: HasCallStack => SiteConfig -> IO [Page]
 loadPages config = do
     -- Build a tree from the directory hierarchy.
-    pathTrie <- makeDirectoryTrie config.pagesDir
+    pathTrie <- listDirectoryAsTrie config.pagesDir
     loadPagesRecursive nullMeta pathTrie
   where
     loadPagesRecursive :: Meta -> RoseTrie OsPath OsPath -> IO [Page]
@@ -337,11 +337,3 @@ makeSitemap config pages = do
                   ("title", escapeStringForXML $! stringify page.menuTitle),
                   ("date", escapeStringForXML $! lookupMetaString "date-meta" meta)
                 ]
-
--- | Make a RoseTrie from a directory tree
-makeDirectoryTrie :: OsPath -> IO (RoseTrie OsPath OsPath)
-makeDirectoryTrie rootDir =
-    let prefixLength = length $! splitDirectories rootDir
-    in  ( listDirectoryRecursive rootDir
-            <&> (roseTrieFromList . fmap (\p -> (drop prefixLength $! splitDirectories p, p)))
-        )

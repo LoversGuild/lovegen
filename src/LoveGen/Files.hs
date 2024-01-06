@@ -17,18 +17,22 @@ module LoveGen.Files (
     readBinaryFile,
     writeBinaryFile,
     listDirectoryRecursive,
+    listDirectoryAsTrie,
 )
 where
 
 import Control.Monad (foldM, when)
 import Data.Bool (bool)
 import Data.ByteString qualified as BS
+import Data.Functor ((<&>))
 import Data.Text qualified as T
 import Data.Text.Encoding
 import GHC.Stack
 import System.Directory.OsPath
 import System.File.OsPath qualified as OP
 import System.OsPath
+
+import LoveGen.RoseTrie
 
 -- | Like if, but condition can be monadic.
 -- Thsi function is only needed inside this module and stays here until the sitaution changes.
@@ -80,3 +84,16 @@ listDirectoryRecursive dir = fmap reverse $! scanDir [dir] dir
         let found' = path : found
         in  doesDirectoryExist path
                 >>= bool (pure $! found') (scanDir found' path)
+
+-- | List a directory recursively and return all entries represented as a
+-- RoseTrie. The path to each node is built off the directory names leading to
+-- the node, and the node itself is the full path of the node.
+listDirectoryAsTrie
+    :: OsPath
+    -- ^ Root of the directory to scan
+    -> IO (RoseTrie OsPath OsPath)
+listDirectoryAsTrie rootDir =
+    let prefixLength = length $! splitDirectories rootDir
+    in  ( listDirectoryRecursive rootDir
+            <&> (roseTrieFromList . fmap (\p -> (drop prefixLength $! splitDirectories p, p)))
+        )
