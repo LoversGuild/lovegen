@@ -15,8 +15,10 @@ module LoveGen (
     module LoveGen.Files,
     module LoveGen.Git,
     module LoveGen.Pandoc,
+    module LoveGen.RoseTrie,
 ) where
 
 import LoveGen.Files
 import LoveGen.Git
 import LoveGen.Pandoc
+import LoveGen.RoseTrie
