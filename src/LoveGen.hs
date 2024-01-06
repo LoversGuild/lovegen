@@ -12,5 +12,7 @@
 -- LoveGen is a support library for writing static website generators.
 -- This module exports all definitions in this package.
 module LoveGen (
-
+    module LoveGen.Git,
 ) where
+
+import LoveGen.Git
