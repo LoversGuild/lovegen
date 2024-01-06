@@ -96,3 +96,4 @@ library
         LoveGen.CommandLine
         LoveGen.Files
         LoveGen.Git
+        LoveGen.Pandoc

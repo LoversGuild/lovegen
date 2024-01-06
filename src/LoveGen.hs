@@ -14,7 +14,9 @@
 module LoveGen (
     module LoveGen.Files,
     module LoveGen.Git,
+    module LoveGen.Pandoc,
 ) where
 
 import LoveGen.Files
 import LoveGen.Git
+import LoveGen.Pandoc
