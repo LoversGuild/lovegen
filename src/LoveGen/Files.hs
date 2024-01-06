@@ -30,6 +30,19 @@ import System.Directory.OsPath
 import System.File.OsPath qualified as OP
 import System.OsPath
 
+-- | Like if, but condition can be monadic.
+-- Thsi function is only needed inside this module and stays here until the sitaution changes.
+ifM
+    :: Monad m
+    => m Bool
+    -- ^ Conditional
+    -> m a
+    -- ^ Then action
+    -> m a
+    -- ^ Else action
+    -> m a
+ifM cond true false = cond >>= bool false true
+
 -- | Read a text file (in UTF-8).
 --
 -- Throws an exception on invalid UTF-8 input
