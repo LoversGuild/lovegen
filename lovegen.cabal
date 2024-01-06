@@ -94,3 +94,4 @@ library
         LoveGen
     other-modules:
         LoveGen.CommandLine
+        LoveGen.Url
