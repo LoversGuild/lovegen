@@ -11,15 +11,19 @@
 --
 -- This module provides file and file system operations for LoveGen.
 module LoveGen.Files (
-    -- * File management
+    -- * Reading and writing files
     readTextFile,
-    writeTextFile,
     readBinaryFile,
+    writeTextFile,
     writeBinaryFile,
-    copyFileIfChanged,
-    copyFilesRecursive,
+
+    -- * Listing directories
     listDirectoryRecursive,
     listDirectoryAsTrie,
+
+    -- * Copying files
+    copyFileIfChanged,
+    copyFilesRecursive,
 )
 where
 
@@ -55,41 +59,20 @@ ifM cond true false = cond >>= bool false true
 readTextFile :: HasCallStack => OsPath -> IO T.Text
 readTextFile = fmap decodeUtf8 . readBinaryFile
 
+-- | Read a file of bytes
+readBinaryFile :: HasCallStack => OsPath -> IO BS.ByteString
+readBinaryFile = OP.readFile'
+
+-- | Write a file of bytes
 -- | Write a text file with UTF-8 encoding
 writeTextFile :: HasCallStack => OsPath -> T.Text -> IO ()
 writeTextFile fp text = writeBinaryFile fp $! encodeUtf8 text
 
--- | Read a file of bytes
-readBinaryFile :: HasCallStack => OsPath -> IO BS.ByteString
-readBinaryFile fp = OP.readFile' fp
-
--- | Write a file of bytes
 writeBinaryFile :: HasCallStack => OsPath -> BS.ByteString -> IO ()
 writeBinaryFile fp bytes = do
     createDirectoryIfMissing True $! takeDirectory fp
     doesFileExist fp >>= flip when (removeFile fp)
     OP.writeFile' fp bytes
-
--- | Copy a single file creating missing directories as necessary. The copy is
--- not performed, if destination file exists, and its size and modification
--- time match the source file.
-copyFileIfChanged
-    :: OsPath
-    -- ^ Source file path
-    -> OsPath
-    -- ^ Destination file path
-    -> IO ()
-copyFileIfChanged source dest = do
-    -- Check if the file needs to be copied
-    doCopy <-
-        ifM (not <$> doesFileExist dest) (pure True) $
-            ifM (liftA2 (/=) (getFileSize source) (getFileSize dest)) (pure True) $
-                ifM (liftA2 (/=) (getModificationTime source) (getModificationTime dest)) (pure True) (pure False)
-
-    when doCopy $ do
-        putStrLn $ "Copying file " <> show source
-        createDirectoryIfMissing True (takeDirectory dest)
-        copyFileWithMetadata source dest
 
 -- | Recursively list all paths under a subdirectory.
 listDirectoryRecursive :: OsPath -> IO [OsPath]
@@ -120,6 +103,27 @@ listDirectoryAsTrie rootDir =
     in  ( listDirectoryRecursive rootDir
             <&> (roseTrieFromList . fmap (\p -> (drop prefixLength $! splitDirectories p, p)))
         )
+
+-- | Copy a single file creating missing directories as necessary. The copy is
+-- not performed, if destination file exists, and its size and modification
+-- time match the source file.
+copyFileIfChanged
+    :: OsPath
+    -- ^ Source file path
+    -> OsPath
+    -- ^ Destination file path
+    -> IO ()
+copyFileIfChanged source dest = do
+    -- Check if the file needs to be copied
+    doCopy <-
+        ifM (not <$> doesFileExist dest) (pure True) $
+            ifM (liftA2 (/=) (getFileSize source) (getFileSize dest)) (pure True) $
+                ifM (liftA2 (/=) (getModificationTime source) (getModificationTime dest)) (pure True) (pure False)
+
+    when doCopy $ do
+        putStrLn $ "Copying file " <> show source
+        createDirectoryIfMissing True (takeDirectory dest)
+        copyFileWithMetadata source dest
 
 -- | Recursively copy all regular files from one directory hierarchy to another,
 -- preserving the relative path structure. Necessary target directories are
