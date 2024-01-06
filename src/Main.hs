@@ -289,15 +289,8 @@ readMarkdownFile config fp =
 
 -- | Copy static files to their destination directories
 copyStaticFiles :: SiteConfig -> IO ()
-copyStaticFiles config = do
-    let staticSegmentsCount = length . splitDirectories $ config.staticDir
-    files <-
-        listDirectoryRecursive config.staticDir
-            >>= filterM doesFileExist
-    forM_ files \sourceFile ->
-        let pathSegments = drop staticSegmentsCount $! splitDirectories sourceFile
-            destFile = joinPath $! config.outputDir : pathSegments
-        in  copyFileIfChanged sourceFile destFile
+copyStaticFiles config
+    = copyFilesRecursive config.staticDir config.outputDir
 
 -- | Create a sitemap from a template
 makeSitemap :: SiteConfig -> [Page] -> IO ()

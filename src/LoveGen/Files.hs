@@ -17,12 +17,13 @@ module LoveGen.Files (
     readBinaryFile,
     writeBinaryFile,
     copyFileIfChanged,
+    copyFilesRecursive,
     listDirectoryRecursive,
     listDirectoryAsTrie,
 )
 where
 
-import Control.Monad (foldM, when)
+import Control.Monad (filterM, foldM, forM_, when)
 import Data.Bool (bool)
 import Data.ByteString qualified as BS
 import Data.Functor ((<&>))
@@ -119,3 +120,23 @@ listDirectoryAsTrie rootDir =
     in  ( listDirectoryRecursive rootDir
             <&> (roseTrieFromList . fmap (\p -> (drop prefixLength $! splitDirectories p, p)))
         )
+
+-- | Recursively copy all regular files from one directory hierarchy to another,
+-- preserving the relative path structure. Necessary target directories are
+-- created as needed. This function leverages 'copyFileIfChanged' to ensure
+-- only modified files are copied.
+copyFilesRecursive
+    :: OsPath
+    -- ^ Source directory
+    -> OsPath
+    -- ^ Target directory
+    -> IO ()
+copyFilesRecursive !sourceDir !targetDir = do
+    let sourceSegmentsCount = length . splitDirectories $ sourceDir
+    files <-
+        listDirectoryRecursive sourceDir
+            >>= filterM doesFileExist
+    forM_ files \sourceFile ->
+        let pathSegments = drop sourceSegmentsCount $! splitDirectories sourceFile
+            targetFile = joinPath $! targetDir : pathSegments
+        in  copyFileIfChanged sourceFile targetFile
