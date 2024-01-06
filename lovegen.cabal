@@ -95,3 +95,4 @@ library
     other-modules:
         LoveGen.CommandLine
         LoveGen.Files
+        LoveGen.Git

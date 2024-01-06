@@ -13,6 +13,8 @@
 -- This module exports all definitions in this package.
 module LoveGen (
     module LoveGen.Files,
+    module LoveGen.Git,
 ) where
 
 import LoveGen.Files
+import LoveGen.Git
