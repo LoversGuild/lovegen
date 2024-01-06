@@ -94,6 +94,7 @@ library
         LoveGen
     other-modules:
         LoveGen.CommandLine
+        LoveGen.Config
         LoveGen.Files
         LoveGen.Git
         LoveGen.Pandoc
