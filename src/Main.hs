@@ -299,27 +299,6 @@ copyStaticFiles config = do
             destFile = joinPath $! config.outputDir : pathSegments
         in  copyFileIfChanged sourceFile destFile
 
--- | Copy a single file creating missing directories as necessary. The copy is
--- not performed, if destination file exists, and its size and modification
--- time match the source file.
-copyFileIfChanged
-    :: OsPath
-    -- ^ Source file path
-    -> OsPath
-    -- ^ Destination file path
-    -> IO ()
-copyFileIfChanged source dest = do
-    -- Check if the file needs to be copied
-    doCopy <-
-        ifM (not <$> doesFileExist dest) (pure True) $
-            ifM (liftA2 (/=) (getFileSize source) (getFileSize dest)) (pure True) $
-                ifM (liftA2 (/=) (getModificationTime source) (getModificationTime dest)) (pure True) (pure False)
-
-    when doCopy $ do
-        putStrLn $ "Copying file " <> show source
-        createDirectoryIfMissing True (takeDirectory dest)
-        copyFileWithMetadata source dest
-
 -- | Create a sitemap from a template
 makeSitemap :: SiteConfig -> [Page] -> IO ()
 makeSitemap config pages = do

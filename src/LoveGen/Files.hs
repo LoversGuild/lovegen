@@ -16,6 +16,7 @@ module LoveGen.Files (
     writeTextFile,
     readBinaryFile,
     writeBinaryFile,
+    copyFileIfChanged,
     listDirectoryRecursive,
     listDirectoryAsTrie,
 )
@@ -67,6 +68,27 @@ writeBinaryFile fp bytes = do
     createDirectoryIfMissing True $! takeDirectory fp
     doesFileExist fp >>= flip when (removeFile fp)
     OP.writeFile' fp bytes
+
+-- | Copy a single file creating missing directories as necessary. The copy is
+-- not performed, if destination file exists, and its size and modification
+-- time match the source file.
+copyFileIfChanged
+    :: OsPath
+    -- ^ Source file path
+    -> OsPath
+    -- ^ Destination file path
+    -> IO ()
+copyFileIfChanged source dest = do
+    -- Check if the file needs to be copied
+    doCopy <-
+        ifM (not <$> doesFileExist dest) (pure True) $
+            ifM (liftA2 (/=) (getFileSize source) (getFileSize dest)) (pure True) $
+                ifM (liftA2 (/=) (getModificationTime source) (getModificationTime dest)) (pure True) (pure False)
+
+    when doCopy $ do
+        putStrLn $ "Copying file " <> show source
+        createDirectoryIfMissing True (takeDirectory dest)
+        copyFileWithMetadata source dest
 
 -- | Recursively list all paths under a subdirectory.
 listDirectoryRecursive :: OsPath -> IO [OsPath]
