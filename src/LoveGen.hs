@@ -7,7 +7,7 @@
 -- Stability   : experimental
 -- Portability : GHC
 --
--- “Make love, not war!”
+-- “Generate Love, not war!”
 --
 -- LoveGen is a support library for writing static website generators.
 -- This module exports all definitions in this package.
