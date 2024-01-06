@@ -98,3 +98,4 @@ library
         LoveGen.Git
         LoveGen.Pandoc
         LoveGen.RoseTrie
+        LoveGen.Url
