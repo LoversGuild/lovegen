@@ -14,6 +14,7 @@
 module LoveGen (
     module LoveGen.Files,
     module LoveGen.Git,
+    module LoveGen.Page,
     module LoveGen.Pandoc,
     module LoveGen.RoseTrie,
     module LoveGen.Url,
@@ -21,6 +22,7 @@ module LoveGen (
 
 import LoveGen.Files
 import LoveGen.Git
+import LoveGen.Page
 import LoveGen.Pandoc
 import LoveGen.RoseTrie
 import LoveGen.Url

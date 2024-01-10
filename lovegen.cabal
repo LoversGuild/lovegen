@@ -97,6 +97,7 @@ library
         LoveGen.Config
         LoveGen.Files
         LoveGen.Git
+        LoveGen.Page
         LoveGen.Pandoc
         LoveGen.RoseTrie
         LoveGen.Url
