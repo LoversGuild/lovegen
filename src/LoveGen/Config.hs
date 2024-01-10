@@ -48,7 +48,7 @@ data SiteConfig = SiteConfig
       -- | A set of optional metadata keys for each page
       optionalMetadata :: HS.HashSet T.Text,
       -- | Amount of heading levels to shift all heading elements
-      shiftHeaders :: Int,
+      shiftHeadings :: Int,
       -- | Markdown reader options
       markdownReaderOptions :: ReaderOptions,
       -- | HTML writer options
@@ -104,7 +104,7 @@ defaultSiteConfig =
                   "title-suffix",
                   "toc"
                 ],
-          shiftHeaders = 1,
+          shiftHeadings = 1,
           markdownReaderOptions = def {readerExtensions = pandocExtensions},
           htmlWriterOptions =
             def
