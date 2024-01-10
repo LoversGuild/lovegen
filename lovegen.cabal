@@ -100,4 +100,5 @@ library
         LoveGen.Page
         LoveGen.Pandoc
         LoveGen.RoseTrie
+        LoveGen.Site
         LoveGen.Url

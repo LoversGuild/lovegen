@@ -17,6 +17,7 @@ module LoveGen (
     module LoveGen.Page,
     module LoveGen.Pandoc,
     module LoveGen.RoseTrie,
+    module LoveGen.Site,
     module LoveGen.Url,
 ) where
 
@@ -25,4 +26,5 @@ import LoveGen.Git
 import LoveGen.Page
 import LoveGen.Pandoc
 import LoveGen.RoseTrie
+import LoveGen.Site
 import LoveGen.Url

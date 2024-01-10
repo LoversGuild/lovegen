@@ -1,50 +1,84 @@
--- | Generate love, not war!
+-- |
+-- Module      : LoveGen.Site
+-- Description : High-level functions for building web sites
+-- Copyright   : Copyright (C) 2023-2024 The Lovers' Guild
+-- License     : AGPL-3
+-- Maintainer  : dev@loversguild.org
+-- Stability   : experimental
+-- Portability : GHC
 --
--- This is the main module of Lover's Guild's static website generator.
-module Main (main) where
+-- This module provides high-level utilities for building a complete website.
+--
+-- The typical workflow is as follows:
+--
+--   1. Create a 'SiteConfig' object.
+--   2. Determine the website's root directory.
+--   3. Execute 'buildSiteInDir' with the configuration and the root directory.
+--
+-- If more control over the build process is needed, lower-level building blocks are also available.
+module LoveGen.Site (
+    -- * Building a complete website
+    buildSite,
+    buildSiteInDir,
 
-import Control.Applicative ((<|>))
-import Control.Monad (ap, filterM, forM, forM_, when)
+    -- * Menu creation
+    MenuTrie,
+    buildMenuTrie,
+    addMenuToPage,
+
+    -- * Sitemap generation
+    buildSiteMap,
+
+    -- * Static file management
+    copyStaticFiles,
+) where
+
 import Data.Bifunctor (second)
-import Data.Bool (bool)
 import Data.HashMap.Strict qualified as HM
 import Data.List (sortOn)
 import Data.Map.Strict qualified as M
 import Data.Text qualified as T
-import Data.Text.Read qualified as T
 import GHC.Stack (HasCallStack)
 import System.Directory.OsPath
 import System.OsPath
 import Text.DocLayout (render)
 import Text.Pandoc hiding (getModificationTime)
+import Text.Pandoc.Shared (stringify)
+import Text.Pandoc.Writers.Shared (lookupMetaString)
 import Text.Pandoc.XML (escapeStringForXML)
 
-import LoveGen.CommandLine
-import LoveGen.Utils
+import LoveGen.Config
+import LoveGen.Files
+import LoveGen.Page
+import LoveGen.Pandoc
+import LoveGen.RoseTrie
+import LoveGen.Url
 
--- | A trie containing data needed for menu creation
-type MenuTrie = RoseTrie Url Page
-
--- | Main function of the generator
-main :: IO ()
-main = do
-    cliOpts <- parseCmdLine
-    rootDir <- encodeFS cliOpts.directory
-    setCurrentDirectory rootDir
-    buildSite finnishSite
-    buildSite englishSite
-
--- | Build a website
+-- | Build a complete website. This function assumes that paths referred to in
+-- the provided 'SiteConfig' object are either absolute or relative to the
+-- current directory. If this is not the case, use 'buildSiteInDir' instead.
 buildSite :: SiteConfig -> IO ()
 buildSite config = do
-    pages <- loadPages config
+    pages <- loadPagesDir config
     let menu = buildMenuTrie pages
-    mapM_ (writePage config.htmlWriterOptions . addMenuToPage menu) pages
+    mapM_ (writePage config . addMenuToPage menu) pages
+    buildSiteMap config pages
     copyStaticFiles config
-    makeSitemap config pages
 
--- | Build a menu trie from all pages
-buildMenuTrie :: [Page] -> MenuTrie
+-- | Like 'buildSite' except it changes the current working directory for the
+-- duration of the site building.
+buildSiteInDir :: SiteConfig -> OsPath -> IO ()
+buildSiteInDir config dir =
+    withCurrentDirectory dir (buildSite config)
+
+-- | A rose trie mappig url path components to 'Page's. This is used to build
+-- a hierarchical menu for pages.
+type MenuTrie = RoseTrie Url Page
+
+-- | Organize the given list of pages into a hierarchy and return it as a
+-- 'MenuTrie'. Hidden pages are not included. If the resulting tree would
+-- contain holes, this function raises an exception.
+buildMenuTrie :: HasCallStack => [Page] -> MenuTrie
 buildMenuTrie = roseTrieFromList . fmap toAssoc . filter (not . (.hidden))
   where
     -- Associate a page with its breadcrumb
@@ -126,14 +160,9 @@ buildMenuForPath initialPath initialMenu =
           ("current", MetaBool isCurrent)
         ]
 
--- | Copy static files to their destination directories
-copyStaticFiles :: SiteConfig -> IO ()
-copyStaticFiles config
-    = copyFilesRecursive config.staticDir config.outputDir
-
 -- | Create a sitemap from a template
-makeSitemap :: SiteConfig -> [Page] -> IO ()
-makeSitemap config pages = do
+buildSiteMap :: SiteConfig -> [Page] -> IO ()
+buildSiteMap config pages = do
     template <- loadTemplate $! config.templatesDir </> config.sitemapTemplateFile
     let metaList = fmap toSitemapMeta . sortOn (.url) . filter (not . (.hidden)) $! pages
         metaMap = M.singleton ("pages" :: T.Text) metaList
@@ -148,3 +177,8 @@ makeSitemap config pages = do
                   ("title", escapeStringForXML $! stringify page.menuTitle),
                   ("date", escapeStringForXML $! lookupMetaString "date-meta" meta)
                 ]
+
+-- | Copy static files to their destination directories
+copyStaticFiles :: SiteConfig -> IO ()
+copyStaticFiles config =
+    copyFilesRecursive config.staticDir config.outputDir
