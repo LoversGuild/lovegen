@@ -11,6 +11,11 @@
 --
 -- This module provides high-level helpers for working with Pandoc.
 module LoveGen.Pandoc (
+    -- * High-level interface
+    loadTemplate,
+    loadYamlMeta,
+    readMarkdownFile,
+
     -- * Pandoc format conversion
     PandocReader,
     PandocWriter,
@@ -35,6 +40,28 @@ import Data.Text qualified as T
 import GHC.Stack (HasCallStack)
 import System.OsPath
 import Text.Pandoc
+import Text.Pandoc.Readers.Markdown (yamlToMeta)
+
+import LoveGen.Files
+
+-- | Load a template from file
+loadTemplate :: HasCallStack => OsPath -> IO (Template T.Text)
+loadTemplate fp = do
+    stringFP <- decodeFS fp
+    text <- readTextFile fp
+    compileTemplate stringFP text
+        >>= either fail pure
+
+-- | Load metadata from YAML file
+loadYamlMeta :: ReaderOptions -> OsPath -> IO Meta
+loadYamlMeta opts fp = do
+    stringFP <- decodeFS fp
+    readBinaryFile fp >>= runPandoc . (yamlToMeta opts (Just stringFP))
+
+-- | Read a markdown file into a pandoc document
+readMarkdownFile :: ReaderOptions -> OsPath -> IO Pandoc
+readMarkdownFile opts fp =
+    readTextFile fp >>= readPandoc (readMarkdown opts) fp
 
 -- | A type for a Pandoc reader function. Make one by applying a Pandoc reader to ReaderOptions.
 type PandocReader = [(FilePath, T.Text)] -> PandocIO Pandoc

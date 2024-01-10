@@ -23,7 +23,6 @@ import System.Directory.OsPath
 import System.OsPath
 import Text.DocLayout (render)
 import Text.Pandoc hiding (getModificationTime)
-import Text.Pandoc.Readers.Markdown (yamlToMeta)
 import Text.Pandoc.Shared (headerShift, stringify)
 import Text.Pandoc.Writers.Shared (lookupMetaString)
 import Text.Pandoc.XML (escapeStringForXML)
@@ -71,7 +70,7 @@ buildSite :: SiteConfig -> IO ()
 buildSite config = do
     pages <- loadPages config
     let menu = buildMenuTrie pages
-    mapM_ (writePage config . addMenuToPage menu) pages
+    mapM_ (writePage config.htmlWriterOptions . addMenuToPage menu) pages
     copyStaticFiles config
     makeSitemap config pages
 
@@ -95,7 +94,7 @@ loadPages config = do
             let metaYamlFile = path </> config.metaYamlFile
             meta' <-
                 doesFileExist metaYamlFile
-                    >>= bool (pure nullMeta) (loadYamlMeta config metaYamlFile)
+                    >>= bool (pure nullMeta) (loadYamlMeta config.markdownReaderOptions metaYamlFile)
             let combinedMeta = metaUnion meta' meta
             forM (HM.elems subforest) (loadPagesRecursive combinedMeta) <&> concat
 
@@ -186,7 +185,7 @@ buildMenuForPath initialPath initialMenu =
 loadPage :: HasCallStack => SiteConfig -> Meta -> OsPath -> IO Page
 loadPage config meta fp = do
     putStrLn $ "Loading page " <> show fp
-    doc <- readMarkdownFile config fp <&> (headerShift config.shiftHeaders)
+    doc <- readMarkdownFile config.markdownReaderOptions fp <&> (headerShift config.shiftHeaders)
 
     -- Metadata handling
     let pagesDirSegments = splitDirectories $! config.pagesDir
@@ -261,31 +260,12 @@ loadPage config meta fp = do
               destFile = destFile
             }
 
--- | Load a template from file
-loadTemplate :: HasCallStack => OsPath -> IO (Template T.Text)
-loadTemplate fp = do
-    stringFP <- decodeFS fp
-    text <- readTextFile fp
-    compileTemplate stringFP text
-        >>= either fail pure
-
--- | Load metadata from YAML file
-loadYamlMeta :: SiteConfig -> OsPath -> IO Meta
-loadYamlMeta config fp = do
-    stringFP <- decodeFS fp
-    readBinaryFile fp >>= runPandoc . (yamlToMeta config.markdownReaderOptions (Just stringFP))
-
 -- | Render a Page to its destination file
 writePage :: SiteConfig -> Page -> IO ()
 writePage config page = do
     putStrLn $ "Writing page " <> (show page.destFile)
     let options = config.htmlWriterOptions {writerTemplate = Just page.template}
     renderPandoc (writeHtml5String options) page.doc >>= writeTextFile page.destFile
-
--- | Load a markdown file into a pandoc document
-readMarkdownFile :: SiteConfig -> OsPath -> IO Pandoc
-readMarkdownFile config fp =
-    readTextFile fp >>= readPandoc (readMarkdown config.markdownReaderOptions) fp
 
 -- | Copy static files to their destination directories
 copyStaticFiles :: SiteConfig -> IO ()
