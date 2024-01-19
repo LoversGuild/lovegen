@@ -56,7 +56,7 @@ loadTemplate fp = do
 loadYamlMeta :: ReaderOptions -> OsPath -> IO Meta
 loadYamlMeta opts fp = do
     stringFP <- decodeFS fp
-    readBinaryFile fp >>= runPandoc . (yamlToMeta opts (Just stringFP))
+    readBinaryFile fp >>= runPandoc . yamlToMeta opts (Just stringFP)
 
 -- | Read a markdown file into a pandoc document
 readMarkdownFile :: ReaderOptions -> OsPath -> IO Pandoc
