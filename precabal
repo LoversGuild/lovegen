@@ -1,4 +1,4 @@
-#!/usr/bin/env -S cabal run --ignore-project --cabal-file=/dev/null --verbose=1 --
+
 -- -*- haskell -*-
 -- Copyright 2024 Aura Kelloniemi
 --
@@ -49,6 +49,7 @@ import Control.Monad (void, when)
 import Control.Monad.IO.Class
 import Control.Monad.Reader
 import Data.Foldable (fold)
+import Data.Functor (($>), (<&>))
 import Data.HashMap.Strict qualified as HM
 import Data.List.NonEmpty qualified as NE
 import Data.Set qualified as Set
@@ -93,7 +94,7 @@ instance Exception ErrorMessage
 main :: IO ()
 main = do
     let action = precabalMain
-        handler = \(ErrorMessage msg) -> do
+        handler (ErrorMessage msg) = do
             T.hPutStrLn stderr msg
             exitWith $! ExitFailure 1
      in action `catch` handler
@@ -108,7 +109,7 @@ precabalMain = do
         Nothing -> do
             if isExtensionOf [osp|cabal.in|] inputFile
                 then pure $! dropExtension inputFile
-                else signalError $ "Input file name does not end in .cabal.in, you need to specify output file name"
+                else signalError "Input file name does not end in .cabal.in, you need to specify output file name"
     packageBoundsFile <- case cli.packageBoundsFile of
         Just bounds -> encodeFS bounds
         Nothing -> pure $! dropFileName inputFile </> [osp|package-bounds.txt|]
@@ -171,7 +172,7 @@ programOptions = do
 
 withUtf8File :: (FilePath -> T.Text -> IO a) -> OsPath -> IO a
 withUtf8File f fp = do
-    contents <- (readFile' fp >>= pure . T.decodeUtf8)
+    contents <- readFile' fp >>= pure . T.decodeUtf8
     fpString <- decodeFS fp
     f fpString contents
 
@@ -180,14 +181,14 @@ handleParseError = \case
     Left err -> signalError $! T.pack . errorBundlePretty $! err
     Right r -> pure $! r
 
-parsePackageBounds :: FilePath -> T.Text -> IO (VariableMap)
+parsePackageBounds :: FilePath -> T.Text -> IO VariableMap
 parsePackageBounds fp text =
     handleParseError $! runParser (variableMap HM.empty) fp text
   where
     variableMap :: VariableMap -> Parsec Void T.Text VariableMap
     variableMap !vars = do
         skipMany (skipSpaceLF1 <|> skipComment)
-        (variableBinding vars >>= variableMap) <|> (eof *> pure vars)
+        (variableBinding vars >>= variableMap) <|> (eof $> vars)
 
     variableBinding :: VariableMap -> Parsec Void T.Text VariableMap
     variableBinding vars =
@@ -204,7 +205,7 @@ parsePackageBounds fp text =
     unquotedText :: Parsec Void T.Text T.Text
     unquotedText = do
         txt <- takeWhile1P (Just "unquoted text") (\ch -> ch >= ' ' && ch /= '"' && ch /= '\'')
-        eol <- (lookAhead (single '\n') *> pure True) <|> pure False
+        eol <- (lookAhead (single '\n') $> True) <|> pure False
         pure $!
             if eol
                 then T.dropWhileEnd (== ' ') txt
@@ -231,7 +232,7 @@ parseTextLine = do
     -- consisting of just whitespace and a comment, and if so, skip the line.
     spaces <- takeWhileP (Just "text") (\ch -> ch == '\t' || ch == ' ')
     commentLine <-
-        (MP.try $! single '$' *> skipComment *> (optional $! single '\n') *> pure True)
+        (MP.try $! ((single '$' *> skipComment *> (optional $! single '\n')) $> True))
             <|> pure False
     if commentLine
         then pure ""
@@ -251,7 +252,7 @@ parseExpansion =
                 [ parseCommand,
                   parseVariable,
                   parseEscapedChar,
-                  skipComment *> pure ""
+                  skipComment $> ""
                 ]
 
 parseCommand :: Parser T.Text
@@ -297,15 +298,15 @@ parseIncludeFile [fileName] = do
                 else
                     pure . Left $
                         "Recursive includes: "
-                            <> T.intercalate ", " (fmap (T.pack . show) $ NE.toList includedFiles')
+                            <> T.intercalate ", " ((T.pack . show) <$> NE.toList includedFiles')
     tryInclude _ [] = fail $! "Could not find include file `" <> T.unpack fileName <> "`"
-parseIncludeFile _ = failParser $ "include-file command takes exactly one argument"
+parseIncludeFile _ = failParser "include-file command takes exactly one argument"
 
 skipSpaceLF1 :: MonadParsec Void T.Text m => m ()
 skipSpaceLF1 = void $ takeWhile1P (Just "space") (\ch -> ch == '\n' || ch == ' ')
 
 skipSpace :: MonadParsec Void T.Text m => m ()
-skipSpace = void $! takeWhileP (Just "space") (\ch -> ch == ' ')
+skipSpace = void $! takeWhileP (Just "space") (== ' ')
 
 parseVariable :: Parser T.Text
 parseVariable = do
@@ -356,12 +357,12 @@ parseEscapedChar :: Parser T.Text
 parseEscapedChar =
     label "escaped character" $!
         ( (T.singleton <$> single '$')
-            <|> (single '\n' *> pure "")
+            <|> (single '\n' $> "")
         )
 
 skipComment :: MonadParsec Void T.Text m => m ()
 skipComment =
-    void $! label "comment" $! chunk "--" *> takeWhileP Nothing (\ch -> ch /= '\n')
+    void $! label "comment" $! chunk "--" *> takeWhileP Nothing (/= '\n')
 
 failParser :: MonadParsec Void T.Text m => T.Text -> m a
 failParser msg = fancyFailure $! Set.singleton (ErrorFail $! T.unpack msg)
