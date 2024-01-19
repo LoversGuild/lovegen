@@ -12,6 +12,7 @@
 -- LoveGen is a support library for writing static website generators.
 -- This module exports all definitions in this package.
 module LoveGen (
+    module LoveGen.Config,
     module LoveGen.Files,
     module LoveGen.Git,
     module LoveGen.Page,
@@ -21,6 +22,7 @@ module LoveGen (
     module LoveGen.Url,
 ) where
 
+import LoveGen.Config
 import LoveGen.Files
 import LoveGen.Git
 import LoveGen.Page
