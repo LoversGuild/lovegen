@@ -13,6 +13,7 @@
 -- This module exports all definitions in this package.
 module LoveGen (
     module LoveGen.Config,
+    module LoveGen.CommandLine,
     module LoveGen.Files,
     module LoveGen.Git,
     module LoveGen.Page,
@@ -22,6 +23,7 @@ module LoveGen (
     module LoveGen.Url,
 ) where
 
+import LoveGen.CommandLine
 import LoveGen.Config
 import LoveGen.Files
 import LoveGen.Git
