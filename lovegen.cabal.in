@@ -1,0 +1,65 @@
+$-- This is a Cabal file template that is used to generate the final cabal file
+$-- for this project using the Precabal tool. Use the `autogen` script from
+$-- the project's root directory to do the generation.
+$--
+$-- This file has the same terms for use and distribution as other files
+$-- in this software. See file LICENSE for details.
+$--
+$-- The following line needs to be the first non-Precabal-style comment line
+$-- in this file due to Cabal restrictions.
+$(include-file cabal/prologue.inc)$
+
+name: lovegen
+version: 0.1.0.0
+synopsis: A simple static website generator for Haskell by Lover's Guild
+description:
+    Generate love, not war!
+
+    This is a Haskell tool for statically generating websites.
+    Its defining feature is support for hierarchical menus.
+    See README.md in source repository for documentation.
+homepage: https://github.com/LoversGuild/lovegen
+license: AGPL-3.0-only
+license-file: LICENSE
+author: Lovers' Guild
+maintainer: dev@loversguild.org
+extra-source-files:
+    README.md
+    .hlint.yaml
+    fourmolu.yaml
+
+source-repository head
+    type: git
+    location: https://github.com/LoversGuild/lovegen
+
+$(include-file cabal/common.inc)$
+
+library
+    import: options
+    build-depends:
+        ${base},
+        ${bytestring},
+        ${containers},
+        ${directory},
+        ${doclayout},
+        ${file-io},
+        ${filepath},
+        ${hashable},
+        ${optparse-applicative},
+        ${pandoc},
+        ${text},
+        ${time},
+        ${typed-process},
+        ${unordered-containers},
+    hs-source-dirs: src
+    exposed-modules:
+        LoveGen
+        LoveGen.CommandLine
+        LoveGen.Config
+        LoveGen.Files
+        LoveGen.Git
+        LoveGen.Page
+        LoveGen.Pandoc
+        LoveGen.RoseTrie
+        LoveGen.Site
+        LoveGen.Url
