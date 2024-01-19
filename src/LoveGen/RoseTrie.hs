@@ -1,8 +1,8 @@
 -- |
 -- Module      : LoveGen.RoseTrie
 -- Description : A prefix trie with associated values and arbitrary number of child nodes
--- Copyright   : Copyright (C) 2023-2024 The Lovers' Guild
--- License     : AGPL-3
+-- Copyright   : Copyright (C) 2022-2024 The Lovers' Guild
+-- License     : GNU Affero General Public License version 3
 -- Maintainer  : dev@loversguild.org
 -- Stability   : experimental
 -- Portability : GHC
