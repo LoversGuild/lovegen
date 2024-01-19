@@ -13,8 +13,10 @@
 module LoveGen.Config (
     SiteConfig (..),
     defaultSiteConfig,
+    LocaleConfig (..),
 ) where
 
+import Data.HashMap.Strict qualified as HM
 import Data.HashSet qualified as HS
 import Data.Text qualified as T
 import Data.Time
@@ -53,10 +55,8 @@ data SiteConfig = SiteConfig
       markdownReaderOptions :: ReaderOptions,
       -- | HTML writer options
       htmlWriterOptions :: WriterOptions,
-      -- | Time locale settings
-      timeLocale :: TimeLocale,
-      -- | Default time format string
-      dateFormat :: T.Text
+      -- | A mapping from language name to locale settings
+      locales :: HM.HashMap T.Text LocaleConfig
     }
     deriving stock (Show)
 
@@ -115,6 +115,17 @@ defaultSiteConfig =
                   writerTemplate = Nothing,
                   writerTOCDepth = 2
                 },
-          timeLocale = defaultTimeLocale,
-          dateFormat = "%Y-%m-%d"
+          locales = HM.empty
         }
+
+-- | LocaleConfig provides settings used to adapt LoveGen to different locales.
+-- NOTE: We don't provide default locale settings, as Haskell only has ones
+-- forEnglish, and supporting only English by default does not feel like a
+-- good idea.
+data LocaleConfig = LocaleConfig
+    { -- | Default time format string
+      dateFormat :: T.Text,
+      -- | Time locale settings
+      timeLocale :: TimeLocale
+    }
+    deriving stock (Show)

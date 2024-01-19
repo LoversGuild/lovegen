@@ -33,6 +33,7 @@ import System.Directory.OsPath
 import System.OsPath
 import Text.Pandoc hiding (getModificationTime)
 import Text.Pandoc.Shared (headerShift, stringify)
+import Text.Pandoc.Writers.Shared (lookupMetaString)
 
 import LoveGen.Config
 import LoveGen.Files
@@ -55,6 +56,8 @@ data Page = Page
       menuTitle :: MetaValue,
       -- | Sorting score for the page in a menu
       order :: Int,
+      -- | Language the page is written in
+      lang :: T.Text,
       -- | Is this page hidden from menus
       hidden :: Bool,
       -- | Template that is to be used to render this page
@@ -102,6 +105,11 @@ loadPage config meta fp = do
             Nothing -> getModificationTime fp
     creationTime <- fetchFirstCommitTime fp <&> fromMaybe time
 
+    let lang = lookupMetaString "locale" $! getDocMeta doc
+    let locale =
+            fromMaybe (error $ "No locale settings for language `" <> show lang <> "` were found") $!
+                HM.lookup lang config.locales
+
     let doc' = flip modifyMeta doc $
             \m ->
                 addMeta "site-root" (MetaString rootUrlRelative)
@@ -109,11 +117,11 @@ loadPage config meta fp = do
                     . addMeta "absolute-url" (MetaString absoluteUrl)
                     . addMeta "url" (MetaString if T.null url then "./" else url)
                     . addMeta "date-meta" (MetaString . T.pack $! iso8601Show time)
-                    . addMeta "date" (MetaString . T.pack $! formatTime config.timeLocale (T.unpack config.dateFormat) time)
+                    . addMeta "date" (MetaString . T.pack $! formatTime locale.timeLocale (T.unpack locale.dateFormat) time)
                     . addMeta "creation-date-meta" (MetaString . T.pack $! iso8601Show creationTime)
                     . addMeta
                         "creation-date"
-                        (MetaString . T.pack $! formatTime config.timeLocale (T.unpack config.dateFormat) creationTime)
+                        (MetaString . T.pack $! formatTime locale.timeLocale (T.unpack locale.dateFormat) creationTime)
                     $! metaUnion m meta
         meta' = getDocMeta doc'
 
@@ -139,6 +147,7 @@ loadPage config meta fp = do
               absoluteUrl = absoluteUrl,
               doc = doc',
               menuTitle = menuTitle,
+              lang = lang,
               order = order,
               hidden = hidden,
               template = template,
