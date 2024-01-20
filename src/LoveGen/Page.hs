@@ -67,20 +67,29 @@ data Page = Page
     }
     deriving stock (Eq, Show)
 
--- | Load a single page from a Markdown file
-loadPage :: HasCallStack => SiteConfig -> Meta -> OsPath -> IO Page
-loadPage config meta fp = do
+-- | Load a single page from a Markdown file.
+loadPage
+    :: HasCallStack
+    => SiteConfig
+    -- ^ Website configuration
+    -> Meta
+    -- ^ Metadata inherited from meta.yaml files or other sources
+    -> OsPath
+    -- ^ FIle name of the page to be loaded
+    -> IO Page
+loadPage config baseMeta fp = do
     putStrLn $ "Loading page " <> show fp
     doc <- readMarkdownFile config.markdownReaderOptions fp <&> (headerShift config.shiftHeadings)
 
     -- Metadata handling
+    let meta = metaUnion (getDocMeta doc) baseMeta
     let pagesDirSegments = splitDirectories $! config.pagesDir
         pagesDirSegmentsCount = length pagesDirSegments
 
     -- Calculate relative url and base target file name either based on the
     -- page file name or the "url" metadata field. Avoid extraneous
     -- encoding/decoding of the file name.
-    (url, baseDestFile) <- case lookupMeta "url" $! getDocMeta doc of
+    (url, baseDestFile) <- case lookupMeta "url" $! meta of
         Just metaUrl -> do
             let urlTrimmed = T.dropAround (== '/') . stringify $! metaUrl
                 urlSlashed = if T.null urlTrimmed then "" else urlTrimmed <> "/"
@@ -105,25 +114,25 @@ loadPage config meta fp = do
             Nothing -> getModificationTime fp
     creationTime <- fetchFirstCommitTime fp <&> fromMaybe time
 
-    let lang = lookupMetaString "locale" $! getDocMeta doc
+    let lang = lookupMetaString "lang" meta
     let locale =
-            fromMaybe (error $ "No locale settings for language `" <> show lang <> "` were found") $!
-                HM.lookup lang config.locales
+            fromMaybe
+                (error $ "No locale settings for language `" <> show lang <> "` were found.")
+                $! HM.lookup lang config.locales
 
-    let doc' = flip modifyMeta doc $
-            \m ->
-                addMeta "site-root" (MetaString rootUrlRelative)
-                    . addMeta "site-url" (MetaString config.siteUrl)
-                    . addMeta "absolute-url" (MetaString absoluteUrl)
-                    . addMeta "url" (MetaString if T.null url then "./" else url)
-                    . addMeta "date-meta" (MetaString . T.pack $! iso8601Show time)
-                    . addMeta "date" (MetaString . T.pack $! formatTime locale.timeLocale (T.unpack locale.dateFormat) time)
-                    . addMeta "creation-date-meta" (MetaString . T.pack $! iso8601Show creationTime)
-                    . addMeta
-                        "creation-date"
-                        (MetaString . T.pack $! formatTime locale.timeLocale (T.unpack locale.dateFormat) creationTime)
-                    $! metaUnion m meta
-        meta' = getDocMeta doc'
+    let meta' =
+            addMeta "site-root" (MetaString rootUrlRelative)
+                . addMeta "site-url" (MetaString config.siteUrl)
+                . addMeta "absolute-url" (MetaString absoluteUrl)
+                . addMeta "url" (MetaString if T.null url then "./" else url)
+                . addMeta "date-meta" (MetaString . T.pack $! iso8601Show time)
+                . addMeta "date" (MetaString . T.pack $! formatTime locale.timeLocale (T.unpack locale.dateFormat) time)
+                . addMeta "creation-date-meta" (MetaString . T.pack $! iso8601Show creationTime)
+                . addMeta
+                    "creation-date"
+                    (MetaString . T.pack $! formatTime locale.timeLocale (T.unpack locale.dateFormat) creationTime)
+                $! meta
+        doc' = setDocMeta meta' doc
 
     verifyMetaKeys config.requiredMetadata config.optionalMetadata meta'
 
