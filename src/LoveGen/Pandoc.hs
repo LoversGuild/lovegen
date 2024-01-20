@@ -26,6 +26,7 @@ module LoveGen.Pandoc (
     -- * Metadata management
     verifyMetaKeys,
     getDocMeta,
+    setDocMeta,
     modifyMeta,
     metaUnion,
     addMeta,
@@ -134,6 +135,12 @@ verifyMetaKeys required optional (Meta mmap) =
 -- | Extract metadata from a Pandoc document
 getDocMeta :: Pandoc -> Meta
 getDocMeta (Pandoc meta _) = meta
+
+-- | Replace old metadata in a document entirely.
+-- | Modify the metadata embedded in a Pandoc
+setDocMeta :: Meta -> Pandoc -> Pandoc
+setDocMeta meta (Pandoc _ blocks) =
+    Pandoc meta blocks
 
 -- | Modify the metadata embedded in a Pandoc
 modifyMeta :: (Meta -> Meta) -> Pandoc -> Pandoc
