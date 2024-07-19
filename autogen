@@ -28,6 +28,9 @@ fi
 
 for file in **/*.cabal.in
 do
+    # Skip package files in dist-newstyle
+    [[ "$file" == dist-newstyle/* ]] && continue
+
     if [ ! -f "${file}" ]; then
         echo "${file} is not a regular file, skipping." >&2
         continue
