@@ -37,6 +37,6 @@ do
     fi
     dest="${file%.in}"
     echo "Generating ${dest}..." >&2
-    ./precabal -b cabal/package.bounds -I. -o "${dest}" -- "${file}"
+    precabal -b cabal/package.bounds -I. -o "${dest}" -- "${file}"
 done
 echo All done!
