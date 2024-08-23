@@ -32,7 +32,8 @@ import GHC.Stack (HasCallStack)
 import System.Directory.OsPath
 import System.OsPath
 import Text.Pandoc hiding (getModificationTime)
-import Text.Pandoc.Shared (headerShift, stringify)
+import Text.Pandoc.Shared (stringify)
+import Text.Pandoc.Transforms (headerShift)
 import Text.Pandoc.Writers.Shared (lookupMetaString)
 
 import LoveGen.Config
