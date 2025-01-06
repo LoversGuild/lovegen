@@ -1,7 +1,7 @@
 -- |
 -- Module      : LoveGen.CommandLine
 -- Description : Command-line argument parser for LoveGen
--- Copyright   : Copyright (C) 2022-2024 The Lovers' Guild
+-- Copyright   : Copyright (C) 2022–2025 The Lovers' Guild
 -- License     : GNU Affero General Public License version 3
 -- Maintainer  : dev@loversguild.org
 -- Stability   : experimental
