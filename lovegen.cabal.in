@@ -10,7 +10,7 @@ $-- in this file due to Cabal restrictions.
 $(include-file cabal/prologue.inc)$
 
 name: lovegen
-version: 0.1.0.0
+version: 0.1.0.1
 synopsis: A simple static website generator for Haskell by Lover's Guild
 description:
     Generate love, not war!
