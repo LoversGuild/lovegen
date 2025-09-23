@@ -102,7 +102,7 @@ addMenuToPage menu page =
 -- following keys/values:
 --
 --     title: The menu-title of the root page of this menu branch
---     url: URLof the root page
+--     url: URL of the root page
 --     level: The depth of the root page in menu hierarchy (starting from 0).
 --     items: MetaList of menu item definitions.
 --
@@ -119,7 +119,7 @@ buildMenuForPath
 buildMenuForPath initialPath initialMenu =
     MetaList $! buildMenuLevels initialPath initialMenu 0
   where
-    -- \| Build menu level definitions for all open branches (following the provided path)
+    -- Build menu level definitions for all open branches (following the provided path)
     buildMenuLevels :: [Url] -> MenuTrie -> Int -> [MetaValue]
     buildMenuLevels path (TrieNode root submenu) level =
         menuLevel : nextMenuLevels path
@@ -127,7 +127,7 @@ buildMenuForPath initialPath initialMenu =
         menuItems :: [MetaValue]
         menuItems = fmap toMenuItem . sortOn ((.order) . snd) . fmap (second getRoot) . HM.toList $ submenu
 
-        -- Converta (Url, Page) pair to a proper menu item.
+        -- Convert a (Url, Page) pair to a proper menu item.
         toMenuItem :: (Url, Page) -> MetaValue
         toMenuItem (p, page) =
             let isCurrent = take 1 path == [p]
